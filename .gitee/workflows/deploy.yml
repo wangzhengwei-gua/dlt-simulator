@@ -1,0 +1,54 @@
+version: '1.0'
+name: dlt-crawl-deploy
+displayName: 大乐透爬虫与部署
+
+triggers:
+  push:
+    branches:
+      include:
+        - master
+        - main
+  schedule:
+    # 大乐透开奖日：每周一、三、六 21:00 左右出结果，21:30 执行爬取
+    # Gitee Go 的 cron 使用北京时间
+    - cron: '30 21 * * 1,3,6'
+
+stages:
+  - name: crawl
+    displayName: 爬取开奖号码
+    steps:
+      - step: shell@1
+        name: crawl_data
+        displayName: 运行爬虫
+        inputs:
+          script: |
+            # 安装依赖
+            pip install requests -q
+
+            # 运行爬虫
+            python scripts/crawler.py
+
+            # 配置 git
+            git config user.name "Gitee Go Bot"
+            git config user.email "noreply@gitee.com"
+
+            # 提交数据更新（如有变化）
+            git add data/latest.json
+            git commit -m "chore: 自动更新大乐透开奖号码 $(date '+%Y-%m-%d %H:%M')" || echo "无数据更新"
+
+            # 推送（需要给流水线配置仓库写权限）
+            git push origin HEAD:${CI_BUILD_REF_NAME:-master} || echo "推送失败，请检查流水线权限设置"
+
+  - name: deploy
+    displayName: 部署提示
+    depends_on: crawl
+    steps:
+      - step: shell@1
+        name: notify
+        displayName: 部署说明
+        inputs:
+          script: |
+            echo "========================================"
+            echo "  数据已更新，Gitee Pages 将自动部署"
+            echo "  请确保已在仓库 [服务] 中开启 Gitee Pages"
+            echo "========================================"

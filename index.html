@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大乐透摇号模拟器</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="bg-decoration">
+        <div class="circle circle-1"></div>
+        <div class="circle circle-2"></div>
+        <div class="circle circle-3"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>🎰 大乐透摇号模拟器</h1>
+            <p class="subtitle">模拟摇号 · 历史号码查询 · 自动更新</p>
+        </header>
+
+        <section class="lottery-stage">
+            <div class="area front-area">
+                <h2>前区 <span class="area-desc">35选5</span></h2>
+                <div class="balls" id="frontBalls"></div>
+            </div>
+            <div class="separator">＋</div>
+            <div class="area back-area">
+                <h2>后区 <span class="area-desc">12选2</span></h2>
+                <div class="balls" id="backBalls"></div>
+            </div>
+        </section>
+
+        <section class="result-display">
+            <p class="result-text" id="resultText">点击下方按钮开始摇号</p>
+        </section>
+
+        <section class="controls">
+            <button id="drawBtn" class="btn btn-primary">🎲 开始摇号</button>
+            <button id="resetBtn" class="btn btn-secondary">🔄 重置</button>
+        </section>
+
+        <section class="latest-result">
+            <h2>📡 最新开奖号码</h2>
+            <div id="latestContent" class="card">
+                <p class="loading">加载中...</p>
+            </div>
+        </section>
+
+        <section class="history">
+            <h2>📜 最近开奖记录</h2>
+            <div id="historyContent" class="card">
+                <p class="loading">加载中...</p>
+            </div>
+        </section>
+
+        <footer>
+            <p>本软件仅供娱乐模拟，与官方开奖无关 · 数据来源：500彩票网</p>
+        </footer>
+    </div>
+
+    <script src="js/simulator.js"></script>
+</body>
+</html>
