@@ -35,13 +35,58 @@ git add -A
 git status --short
 git commit -m $msg
 
-# 3. 推送到 GitHub（GitHub Pages 会自动部署）
+# 3. 推送到 GitHub（自动镜像回退）
 Write-Host "`n[3/3] 推送到 GitHub..." -ForegroundColor Yellow
-git push github master
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "  推送成功" -ForegroundColor Green
+
+# 3a. 先尝试直连 GitHub
+$pushOutput = git push github master 2>&1
+$directResult = $LASTEXITCODE
+
+if ($directResult -eq 0) {
+    Write-Host "  推送成功（直连 GitHub）" -ForegroundColor Green
+} elseif ($pushOutput -match "timed out|Failed to connect|Could not resolve|Connection refused|network") {
+    # 3b. 网络错误 → 自动切换 kkgithub 镜像重试
+    Write-Host "  直连 GitHub 失败（网络超时），切换 kkgithub 镜像推送..." -ForegroundColor Yellow
+
+    # 配置镜像：github.com → kkgithub.com
+    git config --local url."https://kkgithub.com/".insteadOf "https://github.com/"
+
+    # 复制凭据：从 github.com 凭据生成 kkgithub.com 凭据
+    $credFile = Join-Path $env:USERPROFILE ".git-credentials"
+    $addedCred = $false
+    if (Test-Path $credFile) {
+        $lines = Get-Content $credFile -Encoding ascii
+        $ghLine  = $lines | Where-Object { $_ -match "@github.com" }   | Select-Object -First 1
+        $kkExist = $lines | Where-Object { $_ -match "@kkgithub.com" }
+        if ($ghLine -and -not $kkExist) {
+            $auth = $ghLine -replace "https://", "" -replace "@github.com.*", ""
+            Add-Content $credFile "https://${auth}@kkgithub.com" -Encoding ascii
+            $addedCred = $true
+        }
+    }
+
+    # 通过镜像推送
+    git push github master 2>&1
+    $mirrorResult = $LASTEXITCODE
+
+    # 清理镜像配置
+    git config --local --unset url."https://kkgithub.com/".insteadOf 2>$null
+
+    # 清理临时凭据
+    if ($addedCred -and (Test-Path $credFile)) {
+        $lines = Get-Content $credFile -Encoding ascii
+        $lines | Where-Object { $_ -notmatch "@kkgithub.com" } | Set-Content $credFile -Encoding ascii
+    }
+
+    if ($mirrorResult -eq 0) {
+        Write-Host "  推送成功（通过 kkgithub 镜像）" -ForegroundColor Green
+    } else {
+        Write-Host "  镜像推送也失败，请检查网络或手动重试" -ForegroundColor Red
+    }
 } else {
-    Write-Host "  推送失败，可能需要先同步：git pull github master --rebase" -ForegroundColor Red
+    # 非网络错误（如分支冲突），镜像无法解决
+    Write-Host "  推送失败（非网络原因），可能需要先同步：" -ForegroundColor Red
+    Write-Host "    git pull github master --rebase" -ForegroundColor Red
 }
 
 Write-Host "`n================================" -ForegroundColor Cyan
