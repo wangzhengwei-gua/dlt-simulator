@@ -1,5 +1,5 @@
 # ========================================
-# 大乐透模拟器 - 一键更新脚本
+# 摇号模拟器 - 一键更新脚本（大乐透/双色球/排列三）
 # 用法：在 E:\dlt-simulator 目录下运行
 #   powershell -ExecutionPolicy Bypass -File update.ps1
 # 或带提交信息：
@@ -13,13 +13,14 @@ param(
 Set-Location "E:\dlt-simulator"
 
 Write-Host "================================" -ForegroundColor Cyan
-Write-Host "  大乐透模拟器 - 代码更新脚本" -ForegroundColor Cyan
+Write-Host "  摇号模拟器 - 代码更新脚本" -ForegroundColor Cyan
+Write-Host "  大乐透 / 双色球 / 排列三" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor Cyan
 
-# 1. 可选：运行爬虫更新开奖数据
+# 1. 可选：运行爬虫更新开奖数据（三种彩种）
 $updateData = Read-Host "`n是否先运行爬虫更新开奖数据？(y/n)"
 if ($updateData -eq "y" -or $updateData -eq "Y") {
-    Write-Host "`n[1/3] 正在爬取最新开奖数据..." -ForegroundColor Yellow
+    Write-Host "`n[1/3] 正在爬取最新开奖数据（大乐透/双色球/排列三）..." -ForegroundColor Yellow
     python scripts/crawler.py
     if ($LASTEXITCODE -ne 0) {
         Write-Host "爬虫运行失败，请检查网络" -ForegroundColor Red

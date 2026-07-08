@@ -1,116 +1,188 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-大乐透开奖号码爬虫
+彩票开奖号码爬虫 - 大乐透 / 双色球 / 排列三
 数据来源：500彩票网（datachart.500.com）
+
+用法:
+    python scripts/crawler.py            # 爬取全部三种
+    python scripts/crawler.py dlt        # 仅大乐透
+    python scripts/crawler.py ssq        # 仅双色球
+    python scripts/crawler.py pl3        # 仅排列三
 """
 
 import requests
 import json
 import os
 import re
+import sys
 from datetime import datetime
-
-# 500彩票网大乐透历史数据
-API_URL = "https://datachart.500.com/dlt/history/newinc/history.php?limit=30&sort=0"
 
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     ),
-    "Referer": "https://datachart.500.com/dlt/",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-LATEST_FILE = os.path.join(DATA_DIR, "latest.json")
+
+# 各彩种配置
+LOTTERY_SOURCES = {
+    'dlt': {
+        'name': '大乐透',
+        'url': 'https://datachart.500.com/dlt/history/newinc/history.php?limit=30&sort=0',
+        'referer': 'https://datachart.500.com/dlt/',
+        'encoding': 'utf-8',
+        # (字段名, css_class正则, 期望数量)
+        # cfont2 同时匹配 class="cfont2" 和 class="t_cfont2"
+        'areas': [('front', 'cfont2', 5), ('back', 'cfont4', 2)],
+        'output': 'latest.json',
+    },
+    'ssq': {
+        'name': '双色球',
+        'url': 'https://datachart.500.com/ssq/history/newinc/history.php?limit=30&sort=0',
+        'referer': 'https://datachart.500.com/ssq/',
+        'encoding': 'utf-8',
+        # 红球6个(t_cfont2)，蓝球1个(t_cfont4，另有1个&nbsp单元格会被自动过滤)
+        'areas': [('red', 'cfont2', 6), ('blue', 'cfont4', 1)],
+        'output': 'ssq.json',
+    },
+    'pl3': {
+        'name': '排列三',
+        'url': 'https://datachart.500.com/pls/history/inc/history.php?limit=30&sort=0',
+        'referer': 'https://datachart.500.com/pls/',
+        'encoding': 'gb2312',
+        # 3个号码在同一个 cfont2 单元格中(如 "8 3 7")
+        'areas': [('num', 'cfont2', 3)],
+        'output': 'pl3.json',
+    },
+}
 
 
-def crawl():
-    print("[{}] 开始爬取大乐透开奖数据...".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+def fetch_html(config):
+    headers = {**HEADERS, "Referer": config['referer']}
+    resp = requests.get(config['url'], headers=headers, timeout=15)
+    resp.encoding = config['encoding']
+    return resp.text
+
+
+def extract_balls(row_html, css_class, expected_count):
+    """从行中提取指定 css class 的号码
+
+    兼容三种结构:
+      - 大乐透: 多个 <td class="cfont2">XX</td>，每个1个号码
+      - 双色球: 多个 <td class="t_cfont2">XX</td>，每个1个号码
+      - 排列三: 单个 <td class="cfont2">8 3 7</td>，含多个号码
+    cfont2 正则同时匹配 "cfont2" 和 "t_cfont2"；&nbsp; 等无数字单元格自动忽略
+    """
+    cell_pattern = re.compile(
+        r'<td[^>]*' + css_class + r'[^>]*>(.*?)</td>',
+        re.DOTALL
+    )
+    cells = cell_pattern.findall(row_html)
+    numbers = []
+    for cell in cells:
+        nums = re.findall(r'\d+', cell)
+        numbers.extend([int(n) for n in nums])
+    return numbers[:expected_count]
+
+
+def extract_period_and_date(row_html):
+    """提取期号(5+位纯数字)和日期(yyyy-mm-dd)
+
+    兼容大乐透/排列三(期号日期在 t_tr1 单元格)和双色球(期号日期在普通 td)
+    """
+    clean = re.sub(r'<!--.*?-->', '', row_html, flags=re.DOTALL)
+    all_tds = re.findall(r'<td[^>]*>([^<]+)</td>', clean)
+
+    period = ""
+    date = ""
+    for v in all_tds:
+        v = v.strip()
+        if not v or v == '&nbsp;':
+            continue
+        date_match = re.match(r'(\d{4}-\d{2}-\d{2})', v)
+        if date_match and not date:
+            date = date_match.group(1)
+        elif re.match(r'^\d{5,}$', v) and not period:
+            period = v
+    return period, date
+
+
+def crawl_one(lottery_type):
+    config = LOTTERY_SOURCES[lottery_type]
+    name = config['name']
+    print("[{}] 开始爬取{}开奖数据...".format(
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"), name))
 
     try:
-        resp = requests.get(API_URL, headers=HEADERS, timeout=15)
-        # 500彩票网返回 utf-8 内容，但 requests 可能识别为 ISO-8859-1
-        resp.encoding = "utf-8"
-        html = resp.text
+        html = fetch_html(config)
     except Exception as e:
-        print("[ERROR] 请求失败: {}".format(e))
+        print("[ERROR] {} 请求失败: {}".format(name, e))
         return None
 
-    # 提取每行数据：<tr class="t_tr1">...</tr>
-    # 有效数据行包含：期号(t_tr1) + 前区5个(cfont2) + 后区2个(cfont4) + ... + 日期(t_tr1)
-    row_pattern = re.compile(r'<tr class="t_tr1">.*?</tr>', re.DOTALL)
+    # 提取数据行
+    rows = re.findall(r'<tr class="t_tr1">.*?</tr>', html, re.DOTALL)
 
     history = []
-    for row in row_pattern.finditer(html):
-        row_html = row.group(0)
+    for row_html in rows:
+        period, date = extract_period_and_date(row_html)
+        if not period or not date:
+            continue
 
-        # 提取前区号码（class="cfont2"）和后区号码（class="cfont4"）
-        front = [int(x) for x in re.findall(r'<td class="cfont2">(\d+)</td>', row_html)]
-        back = [int(x) for x in re.findall(r'<td class="cfont4">(\d+)</td>', row_html)]
-
-        if len(front) != 5 or len(back) != 2:
-            continue  # 跳过表头等无效行
-
-        # 提取期号（cfont2 之前的第一个 t_tr1 数字，排除注释中的内容）
-        # 先移除 HTML 注释
-        clean = re.sub(r'<!--.*?-->', '', row_html, flags=re.DOTALL)
-        t_tr1_vals = re.findall(r'<td class="t_tr1">([^<]+)</td>', clean)
-        # 期号是第一个纯数字的 t_tr1 值
-        period = ""
-        for v in t_tr1_vals:
-            v = v.strip()
-            if v.isdigit():
-                period = v
+        entry = {'period': period, 'date': date}
+        valid = True
+        for field, css_class, expected in config['areas']:
+            nums = extract_balls(row_html, css_class, expected)
+            if len(nums) != expected:
+                valid = False
                 break
+            entry[field] = nums
 
-        # 提取日期（最后一个 t_tr1 中匹配日期格式的值）
-        date = ""
-        for v in t_tr1_vals:
-            v = v.strip()
-            if re.match(r'\d{4}-\d{2}-\d{2}', v):
-                date = v
-                break
-
-        if period and date:
-            history.append(
-                {
-                    "period": period,
-                    "date": date,
-                    "front": front,
-                    "back": back,
-                }
-            )
+        if valid:
+            history.append(entry)
 
     if not history:
-        print("[ERROR] 未能解析到有效数据")
-        # 保存调试信息
-        debug_path = os.path.join(DATA_DIR, "_crawl_debug.html")
+        print("[ERROR] {} 未能解析到有效数据".format(name))
+        debug_path = os.path.join(DATA_DIR, "_crawl_debug_{}.html".format(lottery_type))
         os.makedirs(DATA_DIR, exist_ok=True)
         with open(debug_path, "w", encoding="utf-8") as f:
-            f.write(html[:10000])
+            f.write(html[:20000])
         print("[DEBUG] HTML 已保存到 {}".format(debug_path))
         return None
 
     # 保存
     os.makedirs(DATA_DIR, exist_ok=True)
+    output_file = os.path.join(DATA_DIR, config['output'])
     result = {
         "latest": history[0],
         "history": history,
         "updateTime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
-
-    with open(LATEST_FILE, "w", encoding="utf-8") as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
-    print("[OK] 爬取成功! 最新一期: 第{}期 ({})".format(history[0]["period"], history[0]["date"]))
-    print("      前区: {}  后区: {}".format(history[0]["front"], history[0]["back"]))
-    print("      共 {} 期数据已保存到 {}".format(len(history), LATEST_FILE))
+    print("[OK] {} 爬取成功! 最新一期: 第{}期 ({})".format(
+        name, history[0]["period"], history[0]["date"]))
+    area_str = "  ".join(
+        "{}: {}".format(f, history[0][f]) for f, _, _ in config['areas'])
+    print("      号码: {}".format(area_str))
+    print("      共 {} 期数据已保存到 {}".format(len(history), output_file))
     return result
 
 
+def crawl(types=None):
+    if types is None:
+        types = list(LOTTERY_SOURCES.keys())
+    for t in types:
+        crawl_one(t)
+        print()
+
+
 if __name__ == "__main__":
-    crawl()
+    args = sys.argv[1:]
+    valid_types = [t for t in args if t in LOTTERY_SOURCES]
+    crawl(valid_types if valid_types else None)

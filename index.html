@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大乐透摇号模拟器</title>
+    <title>摇号模拟器 · 大乐透 / 双色球 / 排列三</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -15,20 +15,18 @@
 
     <div class="container">
         <header>
-            <h1>🎰 大乐透摇号模拟器</h1>
+            <h1 id="pageTitle">🎰 摇号模拟器</h1>
             <p class="subtitle">模拟摇号 · 历史号码查询 · 自动更新</p>
         </header>
 
-        <section class="lottery-stage">
-            <div class="area front-area">
-                <h2>前区 <span class="area-desc">35选5</span></h2>
-                <div class="balls" id="frontBalls"></div>
-            </div>
-            <div class="separator">＋</div>
-            <div class="area back-area">
-                <h2>后区 <span class="area-desc">12选2</span></h2>
-                <div class="balls" id="backBalls"></div>
-            </div>
+        <nav class="tabs">
+            <button class="tab active" data-type="dlt">🎲 大乐透</button>
+            <button class="tab" data-type="ssq">🔴 双色球</button>
+            <button class="tab" data-type="pl3">🎯 排列三</button>
+        </nav>
+
+        <section class="lottery-stage" id="lotteryStage">
+            <!-- 球区由 JS 动态生成 -->
         </section>
 
         <section class="result-display">
