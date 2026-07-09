@@ -2,6 +2,8 @@
 
 一个纯前端的大乐透摇号模拟应用，带滚动减速动画，并可自动爬取官方开奖号码。
 
+🌐 **在线访问**：<https://wangzhengwei-gua.github.io/dlt-simulator/>
+
 ## ✨ 功能
 
 - 🎲 **摇号模拟**：模拟大乐透摇号过程，球体滚动减速动画，依次开出号码
@@ -34,9 +36,11 @@ dlt-simulator/
 
 ## 🚀 快速开始
 
-### 本地预览
+### 在线访问
 
-直接用浏览器打开 `index.html` 即可。
+直接打开网页即可使用（推荐）：
+
+<https://wangzhengwei-gua.github.io/dlt-simulator/>
 
 ### 本地爬取数据
 
