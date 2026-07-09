@@ -16,7 +16,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 HEADERS = {
     "User-Agent": (
@@ -25,6 +25,14 @@ HEADERS = {
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
+
+# 东八区（北京时间）：用于开奖日判断与时间戳，保证 GitHub Actions(UTC) 下也一致
+BJT = timezone(timedelta(hours=8))
+
+
+def now_bjt():
+    return datetime.now(BJT)
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -40,6 +48,8 @@ LOTTERY_SOURCES = {
         # cfont2 同时匹配 class="cfont2" 和 class="t_cfont2"
         'areas': [('front', 'cfont2', 5), ('back', 'cfont4', 2)],
         'output': 'latest.json',
+        # 开奖星期：0=周一 ... 6=周日；大乐透 周一/三/六
+        'draw_days': [0, 2, 5],
     },
     'ssq': {
         'name': '双色球',
@@ -49,6 +59,8 @@ LOTTERY_SOURCES = {
         # 红球6个(t_cfont2)，蓝球1个(t_cfont4，另有1个&nbsp单元格会被自动过滤)
         'areas': [('red', 'cfont2', 6), ('blue', 'cfont4', 1)],
         'output': 'ssq.json',
+        # 双色球 周二/四/日
+        'draw_days': [1, 3, 6],
     },
     'pl3': {
         'name': '排列三',
@@ -58,6 +70,8 @@ LOTTERY_SOURCES = {
         # 3个号码在同一个 cfont2 单元格中(如 "8 3 7")
         'areas': [('num', 'cfont2', 3)],
         'output': 'pl3.json',
+        # 排列三 每日开奖
+        'draw_days': [0, 1, 2, 3, 4, 5, 6],
     },
 }
 
@@ -116,7 +130,12 @@ def crawl_one(lottery_type):
     config = LOTTERY_SOURCES[lottery_type]
     name = config['name']
     print("[{}] 开始爬取{}开奖数据...".format(
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"), name))
+        now_bjt().strftime("%Y-%m-%d %H:%M:%S"), name))
+
+    # 非开奖日跳过，避免无意义的重复爬取
+    if now_bjt().weekday() not in config['draw_days']:
+        print("[SKIP] {} 今日非开奖日，跳过".format(name))
+        return None
 
     try:
         html = fetch_html(config)
@@ -154,13 +173,26 @@ def crawl_one(lottery_type):
         print("[DEBUG] HTML 已保存到 {}".format(debug_path))
         return None
 
-    # 保存
-    os.makedirs(DATA_DIR, exist_ok=True)
+    # 仅当抓到比现有更新的数据时才写入，避免重复爬取产生无意义提交
+    # （配合 workflow 的多次重试：抓到最新数据后，后续重试自动跳过写入）
     output_file = os.path.join(DATA_DIR, config['output'])
+    new_latest_date = history[0]['date']
+    if os.path.exists(output_file):
+        try:
+            with open(output_file, 'r', encoding='utf-8') as f:
+                existing = json.load(f)
+            if new_latest_date <= existing.get('latest', {}).get('date', ''):
+                print("[SKIP] {} 最新数据仍为 {}，暂无新开奖，跳过写入".format(
+                    name, new_latest_date))
+                return None
+        except Exception:
+            pass  # 现有文件读取失败则直接覆盖写入
+
+    os.makedirs(DATA_DIR, exist_ok=True)
     result = {
         "latest": history[0],
         "history": history,
-        "updateTime": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "updateTime": now_bjt().strftime("%Y-%m-%d %H:%M:%S"),
     }
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
