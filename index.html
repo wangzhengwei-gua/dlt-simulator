@@ -36,6 +36,99 @@
         <section class="controls">
             <button id="drawBtn" class="btn btn-primary">🎲 开始摇号</button>
             <button id="resetBtn" class="btn btn-secondary">🔄 重置</button>
+            <button id="matrixBtn" class="btn btn-secondary" style="display:none">🌀 旋转矩阵</button>
+            <button id="pl3Btn" class="btn btn-secondary" style="display:none">🎯 5×5×5复式</button>
+        </section>
+
+        <!-- 旋转矩阵 / 复式面板（仅大乐透） -->
+        <section class="matrix-panel card" id="matrixPanel" style="display:none">
+            <h2>🌀 旋转矩阵 / 复式选号</h2>
+            <p class="matrix-tip">从备选号码池中选号，支持两种方式：<strong>旋转矩阵</strong>（集合覆盖算法，最少注数保证中奖覆盖）与<strong>复式投注</strong>（全组合展开）。</p>
+
+            <div class="mode-switch">
+                <button type="button" class="mode-btn active" data-mode="matrix">🎯 旋转矩阵</button>
+                <button type="button" class="mode-btn" data-mode="compound">📋 复式投注</button>
+            </div>
+
+            <details class="algo-config">
+                <summary>🧮 选号算法配置（12种算法，可勾选启用 / 调节权重）</summary>
+                <div class="algo-help">
+                    <b>权重含义：</b>0=禁用 · 0.1~0.5 弱参考 · 1.0 标准 · 2~5 强主导。调大→结果更偏向该算法。<br>
+                    <b>常见调节：</b>号码扎堆/连号多 → 调大「区间分布」、调小「连号分析」；想抓冷号 → 调大「遗漏回补」；想抓热号 → 调大「热号频率」；想均衡 → 调大 012路/大小/奇偶/区间。
+                </div>
+                <div class="algo-grid" id="algoGrid"></div>
+            </details>
+
+            <div class="compound-schemes" id="compoundSchemes" style="display:none">
+                <span class="scheme-label">快捷复式方案：</span>
+                <button type="button" class="scheme-btn" data-f="7">7+5</button>
+                <button type="button" class="scheme-btn" data-f="8">8+5</button>
+                <button type="button" class="scheme-btn" data-f="9">9+5</button>
+                <button type="button" class="scheme-btn" data-f="10">10+5</button>
+                <button type="button" class="scheme-btn" data-f="12">12+5</button>
+                <button type="button" class="scheme-btn" data-f="15">15+5</button>
+            </div>
+
+            <div class="matrix-area">
+                <h3>前区备选 <span class="area-desc" id="frontCount">已选 0（需 5-15 个）</span></h3>
+                <div class="matrix-pool" id="frontPool"></div>
+                <div class="matrix-guarantee guar-row">
+                    保证级别：
+                    <select id="frontGuarantee">
+                        <option value="5">保 5（全包围）</option>
+                        <option value="4" selected>保 4</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="matrix-area">
+                <h3>后区备选 <span class="area-desc" id="backCount">已选 0（需 2-6 个）</span></h3>
+                <div class="matrix-pool" id="backPool"></div>
+                <div class="matrix-guarantee guar-row">
+                    保证级别：
+                    <select id="backGuarantee">
+                        <option value="2">保 2（全包围）</option>
+                        <option value="1" selected>保 1</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="matrix-actions">
+                <button type="button" id="autoPickBtn" class="btn btn-primary">🎲 智能选号</button>
+                <button type="button" id="smartBtn" class="btn btn-primary">🤖 智能推荐</button>
+                <button type="button" id="genMatrixBtn" class="btn btn-secondary">⚡ 生成当前模式</button>
+                <button type="button" id="testMatrixBtn" class="btn btn-secondary" disabled>🧪 模拟验证</button>
+                <button type="button" id="clearMatrixBtn" class="btn btn-secondary">清空选择</button>
+            </div>
+
+            <div class="matrix-result" id="matrixResult">
+                <p class="loading">请在上方选择备选号码，然后点击「生成」</p>
+            </div>
+        </section>
+
+        <!-- 排列三 5×5×5 复式直选面板 -->
+        <section class="matrix-panel card" id="pl3Panel" style="display:none">
+            <h2>🎯 排列三 5×5×5 复式直选</h2>
+            <p class="matrix-tip">每位（百/十/个位）用算法独立选 5 个数字，共 <strong>5×5×5=125 注</strong>直选。基于历史<strong>位频率、位遗漏、012路/大小/奇偶均衡</strong>分析。</p>
+
+            <details class="algo-config">
+                <summary>🧮 排列三算法配置（6种，可勾选 / 调权重）</summary>
+                <div class="algo-help">
+                    <b>权重含义：</b>0=禁用 · 0.1~0.5 弱参考 · 1.0 标准 · 2~5 强主导。调大→该位结果更偏向该算法。<br>
+                    <b>常见调节：</b>某位偏态 → 调大对应「均衡」算法；抓冷号 → 调大「位遗漏」；抓热号 → 调大「位频率」。
+                </div>
+                <div class="algo-grid" id="pl3AlgoGrid"></div>
+            </details>
+
+            <div class="matrix-actions">
+                <button type="button" id="pl3PickBtn" class="btn btn-primary">🎲 智能选号(5×5×5)</button>
+                <button type="button" id="pl3BacktestBtn" class="btn btn-secondary">🔬 回测命中率</button>
+                <button type="button" id="pl3ClearBtn" class="btn btn-secondary">清空</button>
+            </div>
+
+            <div class="matrix-result" id="pl3Result">
+                <p class="loading">点击「智能选号」生成 5×5×5 复式推荐</p>
+            </div>
         </section>
 
         <section class="latest-result">
