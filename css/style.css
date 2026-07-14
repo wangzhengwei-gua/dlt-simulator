@@ -1615,7 +1615,12 @@ footer {
 }
 
 /* ====== 排列三 走势图 ====== */
-.trend-panel { margin-bottom: 20px; }
+.trend-panel {
+    margin-bottom: 20px;
+    /* 覆盖 .card 的 backdrop-filter，避免在移动端破坏内部 sticky 定位 */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
 
 .trend-panel h2 { font-size: 1.15rem; margin-bottom: 6px; }
 
@@ -1706,10 +1711,14 @@ footer {
 .trend-grid-wrap {
     position: relative;
     overflow: auto;
+    -webkit-overflow-scrolling: touch;
     max-height: 520px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     background: rgba(0, 0, 0, 0.2);
+    /* 强制独立合成层，确保内部 sticky 元素在移动端正常工作 */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
 }
 
 .trend-grid {
