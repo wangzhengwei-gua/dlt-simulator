@@ -131,6 +131,46 @@
             </div>
         </section>
 
+        <!-- 排列三 百/十/个位 奇偶比分析（最近30期） -->
+        <section class="parity-panel card" id="pl3ParityPanel" style="display:none">
+            <h2>📊 排列三 百/十/个位 分析</h2>
+            <p class="matrix-tip">统计指定期数内，<strong>百位 / 十位 / 个位</strong> 各位置在「奇偶 / 大小」两种维度下的出现次数及占比，并附逐期明细。可在上方切换维度与统计期数。</p>
+            <div id="pl3ParityContent">
+                <p class="loading">加载中...</p>
+            </div>
+        </section>
+
+        <!-- 排列三 走势图（百/十/个位 + 手动画线） -->
+        <section class="trend-panel card" id="pl3TrendPanel" style="display:none">
+            <h2>📈 排列三 走势图</h2>
+            <p class="matrix-tip">显示最近 N 期 <strong>百位 / 十位 / 个位</strong> 的数字走势（红圈为当期号码，红线为趋势线）。可切换位置与期数，并可手动画线辅助分析。</p>
+            <div class="trend-toolbar">
+                <div class="trend-pos-switch">
+                    <button type="button" class="trend-pos-btn active" data-pos="0">百位</button>
+                    <button type="button" class="trend-pos-btn" data-pos="1">十位</button>
+                    <button type="button" class="trend-pos-btn" data-pos="2">个位</button>
+                </div>
+                <label class="trend-limit-label">期数：
+                    <select id="pl3TrendLimit">
+                        <option value="30" selected>最近 30 期</option>
+                        <option value="50">最近 50 期</option>
+                        <option value="80">最近 80 期</option>
+                        <option value="100">最近 100 期</option>
+                    </select>
+                </label>
+                <button type="button" class="btn btn-secondary" id="pl3TrendDraw">✏️ 进入画线</button>
+                <button type="button" class="btn btn-secondary" id="pl3TrendClear">🗑️ 清空画线</button>
+            </div>
+            <p class="trend-hint" id="pl3TrendHint"></p>
+            <div class="trend-grid-wrap" id="pl3TrendWrap">
+                <div class="trend-svg-layer" id="pl3TrendSvgLayer"><svg id="pl3TrendSvg"></svg></div>
+                <table class="trend-grid" id="pl3TrendGrid">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
         <section class="latest-result">
             <h2>📡 最新开奖号码</h2>
             <div id="latestContent" class="card">

@@ -41,44 +41,49 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 LOTTERY_SOURCES = {
     'dlt': {
         'name': '大乐透',
-        'url': 'https://datachart.500.com/dlt/history/newinc/history.php?limit=30&sort=0',
+        'url': 'https://datachart.500.com/dlt/history/newinc/history.php?limit={limit}&sort=0',
         'referer': 'https://datachart.500.com/dlt/',
         'encoding': 'utf-8',
         # (字段名, css_class正则, 期望数量)
         # cfont2 同时匹配 class="cfont2" 和 class="t_cfont2"
         'areas': [('front', 'cfont2', 5), ('back', 'cfont4', 2)],
         'output': 'latest.json',
+        # 默认抓取期数
+        'limit': 30,
         # 开奖星期：0=周一 ... 6=周日；大乐透 周一/三/六
         'draw_days': [0, 2, 5],
     },
     'ssq': {
         'name': '双色球',
-        'url': 'https://datachart.500.com/ssq/history/newinc/history.php?limit=30&sort=0',
+        'url': 'https://datachart.500.com/ssq/history/newinc/history.php?limit={limit}&sort=0',
         'referer': 'https://datachart.500.com/ssq/',
         'encoding': 'utf-8',
         # 红球6个(t_cfont2)，蓝球1个(t_cfont4，另有1个&nbsp单元格会被自动过滤)
         'areas': [('red', 'cfont2', 6), ('blue', 'cfont4', 1)],
         'output': 'ssq.json',
+        'limit': 30,
         # 双色球 周二/四/日
         'draw_days': [1, 3, 6],
     },
     'pl3': {
         'name': '排列三',
-        'url': 'https://datachart.500.com/pls/history/inc/history.php?limit=30&sort=0',
+        'url': 'https://datachart.500.com/pls/history/inc/history.php?limit={limit}&sort=0',
         'referer': 'https://datachart.500.com/pls/',
         'encoding': 'gb2312',
         # 3个号码在同一个 cfont2 单元格中(如 "8 3 7")
         'areas': [('num', 'cfont2', 3)],
         'output': 'pl3.json',
-        # 排列三 每日开奖
+        # 排列三 每日开奖，默认抓取较多期数以便奇偶比等分析
+        'limit': 200,
         'draw_days': [0, 1, 2, 3, 4, 5, 6],
     },
 }
 
 
-def fetch_html(config):
+def fetch_html(config, limit=None):
     headers = {**HEADERS, "Referer": config['referer']}
-    resp = requests.get(config['url'], headers=headers, timeout=15)
+    url = config['url'].format(limit=limit or config.get('limit', 30))
+    resp = requests.get(url, headers=headers, timeout=15)
     resp.encoding = config['encoding']
     return resp.text
 
@@ -126,17 +131,18 @@ def extract_period_and_date(row_html):
     return period, date
 
 
-def crawl_one(lottery_type):
+def crawl_one(lottery_type, limit=None, force=False):
     config = LOTTERY_SOURCES[lottery_type]
     name = config['name']
-    print("[{}] 开始爬取{}开奖数据...".format(
-        now_bjt().strftime("%Y-%m-%d %H:%M:%S"), name))
+    eff_limit = limit or config.get('limit', 30)
+    print("[{}] 开始爬取{}开奖数据(limit={})...".format(
+        now_bjt().strftime("%Y-%m-%d %H:%M:%S"), name, eff_limit))
 
     # 不再按"非开奖日"硬性跳过：开奖日当晚若 GitHub Actions schedule 被延迟/丢弃，
     # 非开奖日仍需补爬。是否有新数据由下方日期比较决定，无新数据时自动跳过写入，
     # 不会产生无意义提交。
     try:
-        html = fetch_html(config)
+        html = fetch_html(config, eff_limit)
     except Exception as e:
         print("[ERROR] {} 请求失败: {}".format(name, e))
         return None
@@ -171,18 +177,20 @@ def crawl_one(lottery_type):
         print("[DEBUG] HTML 已保存到 {}".format(debug_path))
         return None
 
-    # 仅当抓到比现有更新的数据时才写入，避免重复爬取产生无意义提交
-    # （配合 workflow 的多次重试：抓到最新数据后，后续重试自动跳过写入）
+    # 仅当抓到比现有更新的数据、或抓到更多期数、或强制写入时才写入
     output_file = os.path.join(DATA_DIR, config['output'])
     new_latest_date = history[0]['date']
-    if os.path.exists(output_file):
+    if not force and os.path.exists(output_file):
         try:
             with open(output_file, 'r', encoding='utf-8') as f:
                 existing = json.load(f)
-            if new_latest_date <= existing.get('latest', {}).get('date', ''):
-                print("[SKIP] {} 最新数据仍为 {}，暂无新开奖，跳过写入".format(
-                    name, new_latest_date))
-                return None
+            existing_latest = existing.get('latest', {}).get('date', '')
+            existing_count = len(existing.get('history', []))
+            if new_latest_date <= existing_latest and len(history) <= existing_count:
+                print("[SKIP] {} 最新数据仍为 {}，且期数未增多({}<={})，跳过写入".format(
+                    name, new_latest_date, len(history), existing_count))
+                # 返回现有数据，供 API 调用方使用
+                return existing
         except Exception:
             pass  # 现有文件读取失败则直接覆盖写入
 
@@ -204,15 +212,23 @@ def crawl_one(lottery_type):
     return result
 
 
-def crawl(types=None):
+def crawl(types=None, limit=None, force=False):
     if types is None:
         types = list(LOTTERY_SOURCES.keys())
     for t in types:
-        crawl_one(t)
+        crawl_one(t, limit=limit, force=force)
         print()
 
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    valid_types = [t for t in args if t in LOTTERY_SOURCES]
-    crawl(valid_types if valid_types else None)
+    import argparse
+    parser = argparse.ArgumentParser(description="彩票开奖号码爬虫")
+    parser.add_argument("types", nargs="*", choices=list(LOTTERY_SOURCES.keys()),
+                        help="要爬取的彩种（留空则全部）")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="抓取期数（覆盖各彩种默认值）")
+    parser.add_argument("--force", action="store_true",
+                        help="强制写入，即使数据无更新")
+    args = parser.parse_args()
+    types = args.types if args.types else None
+    crawl(types, limit=args.limit, force=args.force)
