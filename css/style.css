@@ -1716,8 +1716,6 @@ footer {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     background: rgba(0, 0, 0, 0.2);
-    /* 独立合成层，但不影响 sticky 行为 */
-    isolation: isolate;
 }
 
 @media (max-width: 768px) {
@@ -1755,16 +1753,17 @@ footer {
     min-width: 86px;
     text-align: left;
     padding-left: 10px;
-    background: #1a1a2e;
-    z-index: 2;
+    background: #1f1f4a;
+    z-index: 3;
     font-weight: bold;
     color: rgba(255, 255, 255, 0.75);
     font-size: 0.78rem;
     /* 边框与背景同色，避免格子之间出现淡线 */
-    border-color: #1a1a2e;
-    /* 位置由 JS 同步 transform 控制，不使用 sticky（移动端不可靠） */
-    position: relative;
-    will-change: transform;
+    border-color: #1f1f4a;
+    /* 用 CSS sticky 固定，移位由浏览器原生处理，无视觉跳动 */
+    position: -webkit-sticky;
+    position: sticky;
+    left: 0;
 }
 
 .trend-grid thead th {
@@ -1774,12 +1773,13 @@ footer {
     z-index: 4;
     border: 0;
     box-shadow: inset 0 -2px 0 rgba(245, 175, 25, 0.4);
-    position: relative;
-    will-change: transform;
+    position: -webkit-sticky;
+    position: sticky;
+    top: 0;
 }
 
 .trend-grid thead th.period-col {
-    /* 左上角格 z-index 最高，位置由 JS 同步 transform */
+    /* 左上角格 z-index 最高 */
     z-index: 5;
     background: #1f1f4a;
     border-color: #1f1f4a;
