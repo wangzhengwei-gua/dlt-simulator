@@ -670,6 +670,12 @@ function renderPl3Trend(history) {
 
     // 绑定模式提示
     updateTrendHint();
+
+    // 渲染后立即同步表头/期号列位置（触发 scroll 监听）
+    const wrap = document.getElementById('pl3TrendWrap');
+    if (wrap) {
+        wrap.dispatchEvent(new Event('scroll'));
+    }
 }
 
 function onTrendCellClick(td) {
@@ -859,16 +865,34 @@ function setupTrendControls() {
     // 加载本地画线
     pl3TrendDrawings = loadPl3TrendDrawings();
 
-    // 滚动/尺寸变化时重绘
+    // 滚动/尺寸变化时：同步表头与期号列位置 + 重绘 SVG
+    // （放弃 CSS sticky，移动端不可靠，改用 JS transform 同步）
     const wrap = document.getElementById('pl3TrendWrap');
     if (wrap) {
         let raf = null;
+        const syncTrendHeader = () => {
+            const x = wrap.scrollLeft;
+            const y = wrap.scrollTop;
+            const grid = document.getElementById('pl3TrendGrid');
+            if (!grid) return;
+            // 整个 thead 垂直反向移动（保持在 wrap 顶部）
+            const thead = grid.querySelector('thead');
+            if (thead) thead.style.transform = `translate3d(0, ${y}px, 0)`;
+            // 所有期号列单元格水平反向移动（保持在 wrap 左侧）
+            grid.querySelectorAll('th.period-col, td.period-cell').forEach(cell => {
+                cell.style.transform = `translate3d(${x}px, 0, 0)`;
+            });
+            // 重绘 SVG
+            drawTrendSvg();
+        };
         const onScroll = () => {
             if (raf) cancelAnimationFrame(raf);
-            raf = requestAnimationFrame(drawTrendSvg);
+            raf = requestAnimationFrame(syncTrendHeader);
         };
-        wrap.addEventListener('scroll', onScroll);
+        wrap.addEventListener('scroll', onScroll, { passive: true });
         window.addEventListener('resize', onScroll);
+        // 初次同步
+        syncTrendHeader();
     }
 }
 
