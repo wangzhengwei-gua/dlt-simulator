@@ -1762,6 +1762,8 @@ footer {
     font-weight: bold;
     color: rgba(255, 255, 255, 0.75);
     font-size: 0.78rem;
+    /* 边框与背景同色，避免格子之间出现淡线 */
+    border-color: #1a1a2e;
 }
 
 .trend-grid thead th {
@@ -1776,8 +1778,13 @@ footer {
 }
 
 .trend-grid thead th.period-col {
+    /* 左上角格同时需 top:0 + left:0，单独覆盖以避免被通用规则覆盖 */
+    position: sticky;
+    top: 0;
+    left: 0;
     z-index: 5;
     background: #1f1f4a;
+    border-color: #1f1f4a;
 }
 
 .trend-grid .num-cell { cursor: pointer; transition: background 0.15s; }
