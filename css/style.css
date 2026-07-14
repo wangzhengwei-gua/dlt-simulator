@@ -1842,7 +1842,8 @@ footer {
     top: 0;
     left: 0;
     pointer-events: none;
-    z-index: 3;
+    /* z-index 必须小于 sticky 元素(2/4/5)，让期号列和表头能覆盖趋势线 */
+    z-index: 1;
 }
 
 .trend-svg-layer svg { display: block; }
