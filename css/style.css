@@ -1716,9 +1716,16 @@ footer {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     background: rgba(0, 0, 0, 0.2);
-    /* 强制独立合成层，确保内部 sticky 元素在移动端正常工作 */
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
+    /* 独立合成层，但不影响 sticky 行为 */
+    isolation: isolate;
+}
+
+@media (max-width: 768px) {
+    .trend-grid-wrap {
+        /* 移动端让 wrap 占满屏幕高度，使表头 sticky top:0 贴在屏幕顶部 */
+        max-height: calc(100vh - 220px);
+        min-height: 60vh;
+    }
 }
 
 .trend-grid {
