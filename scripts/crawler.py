@@ -223,12 +223,17 @@ def crawl(types=None, limit=None, force=False):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="彩票开奖号码爬虫")
-    parser.add_argument("types", nargs="*", choices=list(LOTTERY_SOURCES.keys()),
-                        help="要爬取的彩种（留空则全部）")
+    # 注意：nargs="*" 不能配合 choices=，否则不传参时会因空列表报错
+    parser.add_argument("types", nargs="*",
+                        help="要爬取的彩种（留空则全部），可选: " + ", ".join(LOTTERY_SOURCES.keys()))
     parser.add_argument("--limit", type=int, default=None,
                         help="抓取期数（覆盖各彩种默认值）")
     parser.add_argument("--force", action="store_true",
                         help="强制写入，即使数据无更新")
     args = parser.parse_args()
+    invalid = [t for t in args.types if t not in LOTTERY_SOURCES]
+    if invalid:
+        parser.error("未知彩种: {} (可选: {})".format(
+            ', '.join(invalid), ', '.join(LOTTERY_SOURCES.keys())))
     types = args.types if args.types else None
     crawl(types, limit=args.limit, force=args.force)
