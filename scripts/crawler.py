@@ -132,11 +132,9 @@ def crawl_one(lottery_type):
     print("[{}] 开始爬取{}开奖数据...".format(
         now_bjt().strftime("%Y-%m-%d %H:%M:%S"), name))
 
-    # 非开奖日跳过，避免无意义的重复爬取
-    if now_bjt().weekday() not in config['draw_days']:
-        print("[SKIP] {} 今日非开奖日，跳过".format(name))
-        return None
-
+    # 不再按"非开奖日"硬性跳过：开奖日当晚若 GitHub Actions schedule 被延迟/丢弃，
+    # 非开奖日仍需补爬。是否有新数据由下方日期比较决定，无新数据时自动跳过写入，
+    # 不会产生无意义提交。
     try:
         html = fetch_html(config)
     except Exception as e:
