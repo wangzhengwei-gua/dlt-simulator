@@ -180,6 +180,11 @@ header h1 {
     box-shadow: 0 4px 15px rgba(67, 233, 123, 0.5), inset -3px -3px 8px rgba(0,0,0,0.3);
 }
 
+.ball.pl5-ball {
+    background: radial-gradient(circle at 30% 30%, #a855f7, #ec4899);
+    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.5), inset -3px -3px 8px rgba(0,0,0,0.3);
+}
+
 /* 摇奖机混合阶段：球在容器内弹跳翻滚 */
 .balls.mixing {
     border-radius: 50px;
@@ -370,6 +375,7 @@ header h1 {
 .ball-mini.red { background: radial-gradient(circle at 30% 30%, #ff6b6b, #c0392b); }
 .ball-mini.blue { background: radial-gradient(circle at 30% 30%, #4facfe, #0072e3); }
 .ball-mini.pl3 { background: radial-gradient(circle at 30% 30%, #43e97b, #38f9d7); }
+.ball-mini.pl5 { background: radial-gradient(circle at 30% 30%, #a855f7, #ec4899); }
 
 /* 历史记录表格 */
 .history-table {
@@ -405,6 +411,7 @@ header h1 {
 .h-ball.red { background: #c0392b; }
 .h-ball.blue { background: #0072e3; }
 .h-ball.pl3 { background: #2bb673; }
+.h-ball.pl5 { background: #a855f7; }
 
 /* 页脚 */
 footer {

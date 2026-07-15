@@ -77,6 +77,18 @@ LOTTERY_SOURCES = {
         'limit': 200,
         'draw_days': [0, 1, 2, 3, 4, 5, 6],
     },
+    'pl5': {
+        'name': '排列五',
+        'url': 'https://datachart.500.com/plw/history/inc/history.php?limit={limit}&sort=0',
+        'referer': 'https://datachart.500.com/plw/',
+        'encoding': 'gb2312',
+        # 5个号码在同一个 cfont2 单元格中(如 "8 3 7 1 2")
+        'areas': [('num', 'cfont2', 5)],
+        'output': 'pl5.json',
+        # 排列五 每日开奖
+        'limit': 200,
+        'draw_days': [0, 1, 2, 3, 4, 5, 6],
+    },
 }
 
 

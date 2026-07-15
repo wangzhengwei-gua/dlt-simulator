@@ -45,6 +45,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # 提交所有彩种的数据文件（dlt=latest.json / ssq.json / pl3.json）
-          git add data/latest.json data/ssq.json data/pl3.json
-          git diff --staged --quiet || (git commit -m "chore: 自动更新开奖号码（大乐透/双色球/排列三） $(date -u '+%Y-%m-%d %H:%M')" && git push)
+          # 提交所有彩种的数据文件（dlt=latest.json / ssq.json / pl3.json / pl5.json）
+          git add data/latest.json data/ssq.json data/pl3.json data/pl5.json
+          git diff --staged --quiet || (git commit -m "chore: 自动更新开奖号码（大乐透/双色球/排列三/排列五） $(date -u '+%Y-%m-%d %H:%M')" && git push)

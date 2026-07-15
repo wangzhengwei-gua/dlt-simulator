@@ -32,7 +32,20 @@ const LOTTERY_CONFIGS = {
             { id: 'num', label: '号码', desc: '0-9选3位', count: 3, min: 0, max: 9, unique: false, ballClass: 'pl3-ball', colorKey: 'pl3', pad: 1 }
         ],
         dataFile: 'data/pl3.json',
-        separator: null
+        separator: null,
+        // 位名（用于分析/走势图）
+        positions: ['百位', '十位', '个位']
+    },
+    // 排列五：0-9 五位（可重复）
+    pl5: {
+        name: '排列五',
+        emoji: '🎰',
+        areas: [
+            { id: 'num', label: '号码', desc: '0-9选5位', count: 5, min: 0, max: 9, unique: false, ballClass: 'pl5-ball', colorKey: 'pl5', pad: 1 }
+        ],
+        dataFile: 'data/pl5.json',
+        separator: null,
+        positions: ['万位', '千位', '百位', '十位', '个位']
     }
 };
 
@@ -304,6 +317,8 @@ function updateMatrixVisibility() {
     if (!pl3Show) document.getElementById('pl3Panel').style.display = 'none';
     document.getElementById('pl3ParityPanel').style.display = pl3Show ? '' : 'none';
     document.getElementById('pl3TrendPanel').style.display = pl3Show ? '' : 'none';
+    document.getElementById('pl5ParityPanel').style.display = currentType === 'pl5' ? '' : 'none';
+    document.getElementById('pl5TrendPanel').style.display = currentType === 'pl5' ? '' : 'none';
 }
 
 // 加载开奖数据
@@ -324,6 +339,8 @@ async function loadLotteryData() {
         renderHistory(data.history || []);
         renderPl3Parity(data.history || []);
         renderPl3Trend(data.history || []);
+        renderParityPanel('pl5', data.history || []);
+        renderTrendPanel('pl5', data.history || []);
     } catch (e) {
         latestContent.innerHTML = `<p class="loading">⚠️ 暂无${config.name}开奖数据</p>`;
         historyContent.innerHTML = `<p class="loading">⚠️ 暂无历史数据</p>`;
@@ -377,21 +394,23 @@ function renderHistory(history) {
 }
 
 // ====== 排列三 百/十/个位 分析（奇偶 / 大小，可选期数）======
-let pl3ParityHistory = [];        // 缓存最近一次加载的完整历史
-let pl3ParityLimit = 30;          // 当前统计期数
-let pl3ParityDimension = 'odd';   // 当前分析维度：odd=奇偶, size=大小
-const PL3_PARITY_OPTIONS = [30, 50, 80, 100, 150];
+// ====== 排列三/五 位分析（奇偶/大小双维度，按 type 参数化）======
+// 分析面板状态（按彩种）
+const PARITY_STATE = {
+    pl3: { history: [], limit: 30, dimension: 'odd' },
+    pl5: { history: [], limit: 30, dimension: 'odd' },
+};
+const PARITY_OPTIONS = [30, 50, 80, 100, 150];
 
 // 维度配置：a=满足条件的一方（奇/大），b=另一方（偶/小）
-const PL3_DIMENSIONS = {
+const DIMENSIONS = {
     odd: {
         name: '奇偶',
         desc: '奇数 1/3/5/7/9 · 偶数 0/2/4/6/8',
         test: n => n % 2 === 1,
         aChar: '奇', bChar: '偶', aClass: 'odd', bClass: 'even',
         legendA: '奇数（1/3/5/7/9）', legendB: '偶数（0/2/4/6/8）',
-        comboKeys: ['奇奇奇', '奇奇偶', '奇偶奇', '奇偶偶', '偶奇奇', '偶奇偶', '偶偶奇', '偶偶偶'],
-        comboColor: { 3: '#f12711', 2: '#f5af19', 1: '#4facfe', 0: '#0072e3' },
+        comboColor: { 5: '#f12711', 4: '#f5af19', 3: '#f59e0b', 2: '#4facfe', 1: '#06b6d4', 0: '#0072e3' },
         dominant: (a, b) => a >= b ? '奇数偏多' : '偶数偏多',
     },
     size: {
@@ -400,55 +419,70 @@ const PL3_DIMENSIONS = {
         test: n => n >= 5,
         aChar: '大', bChar: '小', aClass: 'big', bClass: 'small',
         legendA: '大数（5/6/7/8/9）', legendB: '小数（0/1/2/3/4）',
-        comboKeys: ['大大大', '大大小', '大小大', '大小小', '小大大', '小大小', '小小大', '小小小'],
-        comboColor: { 3: '#a855f7', 2: '#d946ef', 1: '#06b6d4', 0: '#10b981' },
+        comboColor: { 5: '#a855f7', 4: '#c026d3', 3: '#d946ef', 2: '#06b6d4', 1: '#14b8a6', 0: '#10b981' },
         dominant: (a, b) => a >= b ? '大数偏多' : '小数偏多',
     }
 };
 
-function renderPl3Parity(history) {
-    const panel = document.getElementById('pl3ParityContent');
-    if (!panel) return;
-    if (currentType !== 'pl3') { panel.innerHTML = ''; return; }
+// 生成 n 位的所有组合 keys（n=3 → 8 种，n=5 → 32 种）
+function genComboKeys(dim, n) {
+    const result = [];
+    const total = Math.pow(2, n);
+    for (let i = 0; i < total; i++) {
+        let key = '';
+        for (let bit = n - 1; bit >= 0; bit--) {
+            key += ((i >> bit) & 1) ? dim.bChar : dim.aChar;
+        }
+        result.push(key);
+    }
+    return result;
+}
 
-    pl3ParityHistory = history || [];
-    const maxAvail = pl3ParityHistory.length;
-    const limit = Math.min(pl3ParityLimit, maxAvail);
-    const recent = pl3ParityHistory.slice(0, limit);
+function renderParityPanel(type, history) {
+    const panel = document.getElementById(type + 'ParityContent');
+    if (!panel) return;
+    if (currentType !== type) { panel.innerHTML = ''; return; }
+
+    const state = PARITY_STATE[type];
+    state.history = history || [];
+    const maxAvail = state.history.length;
+    const limit = Math.min(state.limit, maxAvail);
+    const recent = state.history.slice(0, limit);
     if (recent.length === 0) {
         panel.innerHTML = `<p class="loading">暂无历史数据</p>`;
         return;
     }
 
-    const dim = PL3_DIMENSIONS[pl3ParityDimension] || PL3_DIMENSIONS.odd;
-    const positions = ['百位', '十位', '个位'];
+    const dim = DIMENSIONS[state.dimension] || DIMENSIONS.odd;
+    const positions = LOTTERY_CONFIGS[type].positions;
+    const n = positions.length;
     const total = recent.length;
 
     // 每位 a/b 计数
     const stats = positions.map(() => ({ a: 0, b: 0 }));
     recent.forEach(item => {
         const num = item.num || [];
-        num.forEach((n, idx) => {
-            if (idx < 3) {
-                if (dim.test(n)) stats[idx].a++;
-                else stats[idx].b++;
-            }
-        });
+        for (let i = 0; i < n; i++) {
+            if (dim.test(num[i])) stats[i].a++;
+            else stats[i].b++;
+        }
     });
 
-    // 三位组合统计（8 种）
+    // 组合统计（动态生成 keys）
+    const comboKeys = genComboKeys(dim, n);
     const comboCount = {};
-    dim.comboKeys.forEach(k => comboCount[k] = 0);
+    comboKeys.forEach(k => comboCount[k] = 0);
     recent.forEach(item => {
         const num = item.num || [];
-        const form = [0, 1, 2].map(i => dim.test(num[i]) ? dim.aChar : dim.bChar).join('');
+        const form = Array.from({ length: n }, (_, i) => dim.test(num[i]) ? dim.aChar : dim.bChar).join('');
         if (comboCount.hasOwnProperty(form)) comboCount[form]++;
     });
     const aCharRe = new RegExp(dim.aChar, 'g');
-    const comboRows = dim.comboKeys
+    const comboRows = comboKeys
         .map(k => ({ key: k, cnt: comboCount[k], aCnt: (k.match(aCharRe) || []).length }))
-        .sort((a, b) => b.cnt - a.cnt || dim.comboKeys.indexOf(a.key) - dim.comboKeys.indexOf(b.key));
+        .sort((a, b) => b.cnt - a.cnt || comboKeys.indexOf(a.key) - comboKeys.indexOf(b.key));
     const topCombo = comboRows[0];
+    const refPct = (100 / comboKeys.length).toFixed(2);
     const comboBars = comboRows.map(r => {
         const pct = total ? r.cnt / total * 100 : 0;
         const chips = r.key.split('').map(c => `<i class="combo-chip ${c === dim.aChar ? dim.aClass : dim.bClass}">${c}</i>`).join('');
@@ -456,8 +490,8 @@ function renderPl3Parity(history) {
             <div class="combo-row">
                 <div class="combo-label">${chips}</div>
                 <div class="combo-bar-wrap">
-                    <i class="combo-ref" style="left:12.5%;"></i>
-                    <div class="combo-bar" style="width:${pct}%;background:${dim.comboColor[r.aCnt]};"></div>
+                    <i class="combo-ref" style="left:${refPct}%;"></i>
+                    <div class="combo-bar" style="width:${pct}%;background:${dim.comboColor[r.aCnt] || dim.comboColor[0]};"></div>
                     <span class="combo-pct" style="left:calc(${pct}% + 6px);">${pct.toFixed(1)}%</span>
                 </div>
                 <div class="combo-count">${r.cnt} 次</div>
@@ -487,45 +521,45 @@ function renderPl3Parity(history) {
         `;
     }).join('');
 
-    // 逐期明细：N 期 × 3 位，每格显示号码+维度标签
+    // 逐期明细
     const timelineHead = `<tr><th>期号</th><th>日期</th>${positions.map(p => `<th>${p}</th>`).join('')}<th>形态</th></tr>`;
     const timelineBody = recent.map(item => {
         const num = item.num || [];
-        const cells = [0, 1, 2].map(i => {
-            const n = num[i];
-            const isA = dim.test(n);
-            return `<td><span class="oe-cell ${isA ? dim.aClass : dim.bClass}">${n}<small>${isA ? dim.aChar : dim.bChar}</small></span></td>`;
+        const cells = Array.from({ length: n }, (_, i) => {
+            const v = num[i];
+            const isA = dim.test(v);
+            return `<td><span class="oe-cell ${isA ? dim.aClass : dim.bClass}">${v}<small>${isA ? dim.aChar : dim.bChar}</small></span></td>`;
         }).join('');
-        const form = [0, 1, 2].map(i => dim.test(num[i]) ? dim.aChar : dim.bChar).join('');
+        const form = Array.from({ length: n }, (_, i) => dim.test(num[i]) ? dim.aChar : dim.bChar).join('');
         return `<tr><td>${item.period || '--'}</td><td>${item.date || '--'}</td>${cells}<td><span class="oe-form">${form}</span></td></tr>`;
     }).join('');
 
-    // 期数选择器（数据不足的期数仍可选，并显示提示）
-    const insufficient = pl3ParityLimit > maxAvail;
-    const opts = PL3_PARITY_OPTIONS.map(n => {
-        const sel = n === pl3ParityLimit ? ' selected' : '';
-        const note = n > maxAvail ? '（数据不足）' : '';
-        return `<option value="${n}"${sel}>最近 ${n} 期${note}</option>`;
+    // 期数选择器
+    const insufficient = state.limit > maxAvail;
+    const opts = PARITY_OPTIONS.map(v => {
+        const sel = v === state.limit ? ' selected' : '';
+        const note = v > maxAvail ? '（数据不足）' : '';
+        return `<option value="${v}"${sel}>最近 ${v} 期${note}</option>`;
     }).join('');
 
-    // 维度切换按钮
-    const dimBtns = Object.keys(PL3_DIMENSIONS).map(k => {
-        const active = k === pl3ParityDimension ? ' active' : '';
-        return `<button type="button" class="dim-btn${active}" data-dim="${k}">${PL3_DIMENSIONS[k].name}</button>`;
+    // 维度切换
+    const dimBtns = Object.keys(DIMENSIONS).map(k => {
+        const active = k === state.dimension ? ' active' : '';
+        return `<button type="button" class="dim-btn${active}" data-dim="${k}">${DIMENSIONS[k].name}</button>`;
     }).join('');
 
     panel.innerHTML = `
         <div class="parity-toolbar">
             <div class="dim-switch">${dimBtns}</div>
             <label class="parity-limit-label">统计期数：
-                <select id="pl3ParityLimit">
+                <select id="${type}ParityLimit">
                     ${opts}
                 </select>
             </label>
-            <span class="parity-avail">可用历史 <b>${maxAvail}</b> 期${insufficient ? ` · 需 <b>${pl3ParityLimit}</b> 期` : ''}</span>
-            ${insufficient ? `<button type="button" id="pl3ParityFetch" class="btn btn-primary parity-fetch-btn">📥 补充数据（抓取 ${pl3ParityLimit} 期）</button>` : ''}
+            <span class="parity-avail">可用历史 <b>${maxAvail}</b> 期${insufficient ? ` · 需 <b>${state.limit}</b> 期` : ''}</span>
+            ${insufficient ? `<button type="button" id="${type}ParityFetch" class="btn btn-primary parity-fetch-btn">📥 补充数据（抓取 ${state.limit} 期）</button>` : ''}
         </div>
-        ${insufficient ? `<div class="parity-hint" id="pl3ParityHint">当前本地仅有 ${maxAvail} 期数据，点击上方按钮可从 500 彩票网抓取更多期数补充。</div>` : ''}
+        ${insufficient ? `<div class="parity-hint" id="${type}ParityHint">当前本地仅有 ${maxAvail} 期数据，点击上方按钮可从 500 彩票网抓取更多期数补充。</div>` : ''}
         <div class="parity-summary">
             <div class="parity-total">共统计 <b>${total}</b> 期（由近到远）· 当前维度：<b>${dim.name}</b>（${dim.desc}）</div>
             ${summary}
@@ -535,8 +569,8 @@ function renderPl3Parity(history) {
             </div>
         </div>
         <div class="parity-combo">
-            <h3>🎲 三位${dim.name}组合占比（共 8 种）</h3>
-            <p class="combo-desc">按「百位·十位·个位」${dim.name}组合统计，柱状长度为该组合在 ${total} 期中的占比，虚线为理论均衡线 12.5%。最常出现：<b class="combo-top">${topCombo.key}</b>（${(topCombo.cnt / total * 100).toFixed(1)}%）</p>
+            <h3>🎲 ${n}位${dim.name}组合占比（共 ${comboKeys.length} 种）</h3>
+            <p class="combo-desc">按「${positions.join('·')}」${dim.name}组合统计，柱状长度为该组合在 ${total} 期中的占比，虚线为理论均衡线 ${refPct}%。最常出现：<b class="combo-top">${topCombo.key}</b>（${(topCombo.cnt / total * 100).toFixed(1)}%）</p>
             <div class="combo-list">
                 ${comboBars}
             </div>
@@ -552,93 +586,121 @@ function renderPl3Parity(history) {
     // 绑定维度切换
     panel.querySelectorAll('.dim-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            pl3ParityDimension = btn.dataset.dim;
-            renderPl3Parity(pl3ParityHistory);
+            state.dimension = btn.dataset.dim;
+            renderParityPanel(type, state.history);
         });
     });
 
     // 绑定期数切换
-    const sel = document.getElementById('pl3ParityLimit');
+    const sel = document.getElementById(type + 'ParityLimit');
     if (sel) {
         sel.addEventListener('change', e => {
-            pl3ParityLimit = parseInt(e.target.value, 10) || 30;
-            renderPl3Parity(pl3ParityHistory);
+            state.limit = parseInt(e.target.value, 10) || 30;
+            renderParityPanel(type, state.history);
         });
     }
 
     // 绑定补充数据按钮
-    const fetchBtn = document.getElementById('pl3ParityFetch');
+    const fetchBtn = document.getElementById(type + 'ParityFetch');
     if (fetchBtn) {
-        fetchBtn.addEventListener('click', () => fetchPl3ParityMore(pl3ParityLimit));
+        fetchBtn.addEventListener('click', () => fetchParityMore(type, state.limit));
     }
 }
 
-// ====== 排列三 走势图（百/十/个位 + 手动画线）======
-let pl3TrendHistory = [];
-let pl3TrendLimit = 30;
-let pl3TrendPos = 0;            // 0=百位, 1=十位, 2=个位
-let pl3TrendDrawMode = false;   // 是否处于画线模式
-let pl3TrendDrawStart = null;   // 画线起点（{row, col}）
-let pl3TrendDrawings = [];      // 已画线：[{key1, key2}, ...]
-const PL3_TREND_DRAW_KEY = 'pl3TrendDrawings';
+// 兼容旧调用
+function renderPl3Parity(history) { return renderParityPanel('pl3', history); }
 
-function loadPl3TrendDrawings() {
+// 按需抓取更多期数并刷新分析与走势图
+async function fetchParityMore(type, limit) {
+    const btn = document.getElementById(type + 'ParityFetch');
+    const hint = document.getElementById(type + 'ParityHint');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 正在抓取数据...'; }
+    if (hint) { hint.textContent = '正在从 500 彩票网抓取数据，请稍候...'; }
+
     try {
-        const raw = localStorage.getItem(PL3_TREND_DRAW_KEY);
+        const resp = await fetch(`/api/crawl?type=${type}&limit=${limit}&t=${Date.now()}`);
+        if (!resp.ok) throw new Error('接口返回 ' + resp.status);
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || '抓取失败');
+
+        PARITY_STATE[type].history = data.history || [];
+        TREND_STATE[type].history = data.history || [];
+        renderParityPanel(type, PARITY_STATE[type].history);
+        renderTrendPanel(type, TREND_STATE[type].history);
+
+        if (data.latest) {
+            try { renderLatest(data.latest); } catch (e) { /* 忽略 */ }
+        }
+    } catch (e) {
+        const msg = `⚠️ 抓取失败：${e.message}。请确认已用「python serve.py」启动本地服务器（普通 http.server 无爬取接口）。`;
+        if (hint) { hint.innerHTML = msg; }
+        if (btn) { btn.disabled = false; btn.textContent = '📥 重新补充数据'; }
+    }
+}
+
+// ====== 走势图（按 type 参数化，支持 pl3/pl5）======
+const TREND_STATE = {
+    pl3: { history: [], limit: 30, pos: 0, drawMode: false, drawStart: null, drawings: [] },
+    pl5: { history: [], limit: 30, pos: 0, drawMode: false, drawStart: null, drawings: [] },
+};
+
+function loadTrendDrawings(type) {
+    try {
+        const raw = localStorage.getItem(type + 'TrendDrawings');
         return raw ? JSON.parse(raw) : [];
     } catch (e) { return []; }
 }
 
-function savePl3TrendDrawings() {
+function saveTrendDrawings(type) {
     try {
-        localStorage.setItem(PL3_TREND_DRAW_KEY, JSON.stringify(pl3TrendDrawings));
+        localStorage.setItem(type + 'TrendDrawings', JSON.stringify(TREND_STATE[type].drawings));
     } catch (e) { /* 忽略 */ }
 }
 
-function getCurrentTrendDrawings() {
-    // 当前 pos + limit 下的画线
-    return pl3TrendDrawings.filter(d => d.pos === pl3TrendPos && d.limit === pl3TrendLimit);
+function getCurrentTrendDrawings(type) {
+    const s = TREND_STATE[type];
+    return s.drawings.filter(d => d.pos === s.pos && d.limit === s.limit);
 }
 
-function addPl3TrendDrawing(k1, k2) {
-    // 避免重复
-    const exists = pl3TrendDrawings.some(d => d.pos === pl3TrendPos && d.limit === pl3TrendLimit &&
+function addTrendDrawing(type, k1, k2) {
+    const s = TREND_STATE[type];
+    const exists = s.drawings.some(d => d.pos === s.pos && d.limit === s.limit &&
         ((d.k1 === k1 && d.k2 === k2) || (d.k1 === k2 && d.k2 === k1)));
     if (exists) return false;
-    pl3TrendDrawings.push({ pos: pl3TrendPos, limit: pl3TrendLimit, k1, k2 });
-    savePl3TrendDrawings();
+    s.drawings.push({ pos: s.pos, limit: s.limit, k1, k2 });
+    saveTrendDrawings(type);
     return true;
 }
 
-function clearPl3TrendDrawings() {
-    pl3TrendDrawings = pl3TrendDrawings.filter(d => !(d.pos === pl3TrendPos && d.limit === pl3TrendLimit));
-    savePl3TrendDrawings();
+function clearTrendDrawings(type) {
+    const s = TREND_STATE[type];
+    s.drawings = s.drawings.filter(d => !(d.pos === s.pos && d.limit === s.limit));
+    saveTrendDrawings(type);
 }
 
-function renderPl3Trend(history) {
-    const panel = document.getElementById('pl3TrendPanel');
+function renderTrendPanel(type, history) {
+    const panel = document.getElementById(type + 'TrendPanel');
     if (!panel) return;
-    if (currentType !== 'pl3') return;
-    pl3TrendHistory = history || [];
-    const recent = pl3TrendHistory.slice(0, pl3TrendLimit);
-    // 期号从小到大：最早的在上，最新的（最新一期）在下
+    if (currentType !== type) return;
+    const s = TREND_STATE[type];
+    s.history = history || [];
+    const recent = s.history.slice(0, s.limit);
     const items = [...recent].reverse();
-    const grid = document.getElementById('pl3TrendGrid');
+    const grid = document.getElementById(type + 'TrendGrid');
+    if (!grid) return;
     const thead = grid.querySelector('thead');
     const tbody = grid.querySelector('tbody');
     if (!thead || !tbody) return;
 
-    // 表头
     let head = '<tr><th class="period-col">期号</th>';
     for (let n = 0; n < 10; n++) head += `<th>${n}</th>`;
     head += '</tr>';
     thead.innerHTML = head;
 
-    // 实际数据行
     let body = '';
     items.forEach((item, rowIdx) => {
         const num = item.num || [];
-        const n = num[pl3TrendPos];
+        const n = num[s.pos];
         body += `<tr><td class="period-cell">${item.period || '--'}</td>`;
         for (let col = 0; col < 10; col++) {
             const hit = (n === col);
@@ -648,7 +710,6 @@ function renderPl3Trend(history) {
         body += '</tr>';
     });
 
-    // 预测行（最新一期 + 1，特殊颜色）
     const lastPeriod = items.length > 0 ? parseInt(items[items.length - 1].period, 10) : null;
     const predictPeriod = (lastPeriod && !isNaN(lastPeriod)) ? (lastPeriod + 1) : '';
     const predictRowIdx = items.length;
@@ -660,66 +721,65 @@ function renderPl3Trend(history) {
 
     tbody.innerHTML = body;
 
-    // 绘制趋势线与手动画线
-    drawTrendSvg();
+    drawTrendSvg(type);
 
-    // 绑定格子点击（画线）
     tbody.querySelectorAll('.num-cell').forEach(td => {
-        td.addEventListener('click', () => onTrendCellClick(td));
+        td.addEventListener('click', () => onTrendCellClick(type, td));
     });
 
-    // 绑定模式提示
-    updateTrendHint();
+    updateTrendHint(type);
 }
 
-function onTrendCellClick(td) {
-    if (!pl3TrendDrawMode) return;
+// 兼容旧调用
+function renderPl3Trend(history) { return renderTrendPanel('pl3', history); }
+
+function onTrendCellClick(type, td) {
+    const s = TREND_STATE[type];
+    if (!s.drawMode) return;
     const row = parseInt(td.dataset.row, 10);
     const col = parseInt(td.dataset.col, 10);
     const key = `r${row}c${col}`;
-    if (!pl3TrendDrawStart) {
-        pl3TrendDrawStart = { row, col, key, el: td };
+    if (!s.drawStart) {
+        s.drawStart = { row, col, key, el: td };
         td.classList.add('draw-start');
     } else {
-        if (pl3TrendDrawStart.key === key) {
-            // 取消
-            pl3TrendDrawStart.el.classList.remove('draw-start');
-            pl3TrendDrawStart = null;
+        if (s.drawStart.key === key) {
+            s.drawStart.el.classList.remove('draw-start');
+            s.drawStart = null;
         } else {
-            addPl3TrendDrawing(pl3TrendDrawStart.key, key);
-            pl3TrendDrawStart.el.classList.remove('draw-start');
-            pl3TrendDrawStart = null;
-            drawTrendSvg();
+            addTrendDrawing(type, s.drawStart.key, key);
+            s.drawStart.el.classList.remove('draw-start');
+            s.drawStart = null;
+            drawTrendSvg(type);
         }
     }
-    updateTrendHint();
+    updateTrendHint(type);
 }
 
 // 缩短线段两端（避免线条穿进球体）
 function shrinkLine(x1, y1, x2, y2, dist) {
     const dx = x2 - x1, dy = y2 - y1;
     const len = Math.sqrt(dx * dx + dy * dy);
-    if (len <= dist * 2) return [x1, y1, x2, y2]; // 太短不缩
+    if (len <= dist * 2) return [x1, y1, x2, y2];
     const ux = dx / len, uy = dy / len;
     return [x1 + ux * dist, y1 + uy * dist, x2 - ux * dist, y2 - uy * dist];
 }
 
-function drawTrendSvg() {
-    const svg = document.getElementById('pl3TrendSvg');
-    const grid = document.getElementById('pl3TrendGrid');
+function drawTrendSvg(type) {
+    const svg = document.getElementById(type + 'TrendSvg');
+    const grid = document.getElementById(type + 'TrendGrid');
+    if (!svg || !grid) return;
     const tbody = grid.querySelector('tbody');
-    if (!svg || !tbody) return;
-
-    // 设置 SVG 大小等于 wrap
-    const wrap = document.getElementById('pl3TrendWrap');
+    if (!tbody) return;
+    const wrap = document.getElementById(type + 'TrendWrap');
+    if (!wrap) return;
     const wrapRect = wrap.getBoundingClientRect();
     svg.setAttribute('width', wrap.scrollWidth);
     svg.setAttribute('height', wrap.scrollHeight);
     svg.setAttribute('viewBox', `0 0 ${wrap.scrollWidth} ${wrap.scrollHeight}`);
-
     svg.innerHTML = '';
 
-    // 1. 自动趋势线（红色折线连接每行红圈）
+    // 自动趋势线
     const hits = tbody.querySelectorAll('.num-cell.hit');
     if (hits.length >= 2) {
         const pts = [];
@@ -731,13 +791,10 @@ function drawTrendSvg() {
             });
         });
         for (let i = 0; i < pts.length - 1; i++) {
-            // 缩短端点，使线条不进到球内
             const [x1, y1, x2, y2] = shrinkLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y, 14);
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', x1);
-            line.setAttribute('y1', y1);
-            line.setAttribute('x2', x2);
-            line.setAttribute('y2', y2);
+            line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+            line.setAttribute('x2', x2); line.setAttribute('y2', y2);
             line.setAttribute('stroke', '#f12711');
             line.setAttribute('stroke-width', '1.6');
             line.setAttribute('stroke-linecap', 'round');
@@ -746,11 +803,11 @@ function drawTrendSvg() {
         }
     }
 
-    // 2. 手动画线（绿色虚线）
-    const drawings = getCurrentTrendDrawings();
+    // 手动画线
+    const drawings = getCurrentTrendDrawings(type);
     drawings.forEach(d => {
-        const c1 = findTrendCell(d.k1);
-        const c2 = findTrendCell(d.k2);
+        const c1 = findTrendCell(type, d.k1);
+        const c2 = findTrendCell(type, d.k2);
         if (!c1 || !c2) return;
         const r1 = c1.getBoundingClientRect();
         const r2 = c2.getBoundingClientRect();
@@ -758,27 +815,20 @@ function drawTrendSvg() {
         const y1c = r1.top - wrapRect.top + r1.height / 2 + wrap.scrollTop;
         const x2c = r2.left - wrapRect.left + r2.width / 2 + wrap.scrollLeft;
         const y2c = r2.top - wrapRect.top + r2.height / 2 + wrap.scrollTop;
-        // 缩短端点
         const [x1, y1, x2, y2] = shrinkLine(x1c, y1c, x2c, y2c, 15);
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', x1);
-        line.setAttribute('y1', y1);
-        line.setAttribute('x2', x2);
-        line.setAttribute('y2', y2);
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+        line.setAttribute('x2', x2); line.setAttribute('y2', y2);
         line.setAttribute('stroke', '#43e97b');
         line.setAttribute('stroke-width', '2.5');
         line.setAttribute('stroke-linecap', 'round');
         line.setAttribute('stroke-dasharray', '5 3');
         svg.appendChild(line);
-
-        // 在端点画一个小圆点（命中格显示红圆，其他格显示绿圆）
-        [{ x: x1c, y: y1c, hit: c1.classList.contains('hit') || c1.dataset.predict === '1' },
-         { x: x2c, y: y2c, hit: c2.classList.contains('hit') || c2.dataset.predict === '1' }].forEach(p => {
+        [{ x: x1c, y: y1c }, { x: x2c, y: y2c }].forEach(p => {
             const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            dot.setAttribute('cx', p.x);
-            dot.setAttribute('cy', p.y);
+            dot.setAttribute('cx', p.x); dot.setAttribute('cy', p.y);
             dot.setAttribute('r', '4');
-            dot.setAttribute('fill', p.hit ? '#43e97b' : '#43e97b');
+            dot.setAttribute('fill', '#43e97b');
             dot.setAttribute('stroke', '#0f4c3a');
             dot.setAttribute('stroke-width', '1.2');
             svg.appendChild(dot);
@@ -786,122 +836,89 @@ function drawTrendSvg() {
     });
 }
 
-function findTrendCell(key) {
-    return document.querySelector(`#pl3TrendGrid td[data-row="${key.match(/r(\d+)/)[1]}"][data-col="${key.match(/c(\d+)/)[1]}"]`);
+function findTrendCell(type, key) {
+    return document.querySelector(`#${type}TrendGrid td[data-row="${key.match(/r(\d+)/)[1]}"][data-col="${key.match(/c(\d+)/)[1]}"]`);
 }
 
-function updateTrendHint() {
-    const hint = document.getElementById('pl3TrendHint');
+function updateTrendHint(type) {
+    const s = TREND_STATE[type];
+    const hint = document.getElementById(type + 'TrendHint');
     if (!hint) return;
-    const drawBtn = document.getElementById('pl3TrendDraw');
-    if (pl3TrendDrawMode) {
-        if (!pl3TrendDrawStart) {
-            hint.innerHTML = '✏️ <b>画线模式</b>：请点击第一个格子（起点）';
-        } else {
-            hint.innerHTML = '✏️ <b>画线模式</b>：请点击第二个格子（终点），点击起点可取消';
-        }
+    const drawBtn = document.getElementById(type + 'TrendDraw');
+    if (s.drawMode) {
+        hint.innerHTML = !s.drawStart ? '✏️ <b>画线模式</b>：请点击第一个格子（起点）' : '✏️ <b>画线模式</b>：请点击第二个格子（终点），点击起点可取消';
         hint.className = 'trend-hint draw-on';
-        drawBtn.textContent = '✅ 退出画线';
-        drawBtn.classList.add('active');
+        if (drawBtn) { drawBtn.textContent = '✅ 退出画线'; drawBtn.classList.add('active'); }
     } else {
-        const n = getCurrentTrendDrawings().length;
+        const n = getCurrentTrendDrawings(type).length;
         hint.innerHTML = n > 0 ? `已画线 <b>${n}</b> 条（绿色虚线，保存于本地）` : '点击「✏️ 进入画线」可手动画线分析';
         hint.className = 'trend-hint';
-        drawBtn.textContent = '✏️ 进入画线';
-        drawBtn.classList.remove('active');
+        if (drawBtn) { drawBtn.textContent = '✏️ 进入画线'; drawBtn.classList.remove('active'); }
     }
 }
 
-// 切换位置
-function setupTrendPosSwitch() {
-    document.querySelectorAll('.trend-pos-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            pl3TrendPos = parseInt(btn.dataset.pos, 10);
-            pl3TrendDrawStart = null;
-            document.querySelectorAll('.trend-pos-btn').forEach(b => b.classList.toggle('active', b === btn));
-            renderPl3Trend(pl3TrendHistory);
-        });
-    });
-}
-
-// 初始化走势图相关控件（仅一次）
+// 初始化所有走势图控件（pl3 + pl5）
 function setupTrendControls() {
-    const limitSel = document.getElementById('pl3TrendLimit');
-    if (limitSel) {
-        limitSel.addEventListener('change', e => {
-            pl3TrendLimit = parseInt(e.target.value, 10) || 30;
-            pl3TrendDrawStart = null;
-            renderPl3Trend(pl3TrendHistory);
+    ['pl3', 'pl5'].forEach(type => {
+        const limitSel = document.getElementById(type + 'TrendLimit');
+        if (limitSel) {
+            limitSel.addEventListener('change', e => {
+                TREND_STATE[type].limit = parseInt(e.target.value, 10) || 30;
+                TREND_STATE[type].drawStart = null;
+                renderTrendPanel(type, TREND_STATE[type].history);
+            });
+        }
+        const drawBtn = document.getElementById(type + 'TrendDraw');
+        if (drawBtn) {
+            drawBtn.addEventListener('click', () => {
+                TREND_STATE[type].drawMode = !TREND_STATE[type].drawMode;
+                TREND_STATE[type].drawStart = null;
+                document.querySelectorAll(`#${type}TrendGrid .num-cell.draw-start`).forEach(el => el.classList.remove('draw-start'));
+                updateTrendHint(type);
+            });
+        }
+        const clearBtn = document.getElementById(type + 'TrendClear');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                if (getCurrentTrendDrawings(type).length === 0) return;
+                if (confirm('确定清空当前维度与期数下的所有手动画线吗？')) {
+                    clearTrendDrawings(type);
+                    drawTrendSvg(type);
+                    updateTrendHint(type);
+                }
+            });
+        }
+        // 位置切换
+        document.querySelectorAll(`#${type}TrendPanel .trend-pos-btn`).forEach(btn => {
+            btn.addEventListener('click', () => {
+                TREND_STATE[type].pos = parseInt(btn.dataset.pos, 10);
+                TREND_STATE[type].drawStart = null;
+                document.querySelectorAll(`#${type}TrendPanel .trend-pos-btn`).forEach(b => b.classList.toggle('active', b === btn));
+                renderTrendPanel(type, TREND_STATE[type].history);
+            });
         });
-    }
-    const drawBtn = document.getElementById('pl3TrendDraw');
-    if (drawBtn) {
-        drawBtn.addEventListener('click', () => {
-            pl3TrendDrawMode = !pl3TrendDrawMode;
-            pl3TrendDrawStart = null;
-            document.querySelectorAll('.num-cell.draw-start').forEach(el => el.classList.remove('draw-start'));
-            updateTrendHint();
-        });
-    }
-    const clearBtn = document.getElementById('pl3TrendClear');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            if (getCurrentTrendDrawings().length === 0) return;
-            if (confirm('确定清空当前维度与期数下的所有手动画线吗？')) {
-                clearPl3TrendDrawings();
-                drawTrendSvg();
-                updateTrendHint();
-            }
-        });
-    }
-    setupTrendPosSwitch();
-
-    // 加载本地画线
-    pl3TrendDrawings = loadPl3TrendDrawings();
-
-    // 滚动/尺寸变化时重绘 SVG（表头与期号列由 CSS sticky 固定，浏览器原生处理）
-    const wrap = document.getElementById('pl3TrendWrap');
-    if (wrap) {
-        let raf = null;
-        const onScroll = () => {
-            if (raf) cancelAnimationFrame(raf);
-            raf = requestAnimationFrame(drawTrendSvg);
-        };
-        wrap.addEventListener('scroll', onScroll, { passive: true });
-        window.addEventListener('resize', onScroll);
-    }
+        // 加载本地画线
+        TREND_STATE[type].drawings = loadTrendDrawings(type);
+        // 滚动重绘
+        const wrap = document.getElementById(type + 'TrendWrap');
+        if (wrap) {
+            let raf = null;
+            const onScroll = () => {
+                if (raf) cancelAnimationFrame(raf);
+                raf = requestAnimationFrame(() => drawTrendSvg(type));
+            };
+            wrap.addEventListener('scroll', onScroll, { passive: true });
+            window.addEventListener('resize', onScroll);
+        }
+    });
 }
 
 // 按需抓取更多排列三期数并刷新奇偶比分析
 async function fetchPl3ParityMore(limit) {
-    const btn = document.getElementById('pl3ParityFetch');
-    const hint = document.getElementById('pl3ParityHint');
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ 正在抓取数据...'; }
-    if (hint) { hint.textContent = '正在从 500 彩票网抓取数据，请稍候...'; }
-
-    try {
-        const resp = await fetch(`/api/crawl?type=pl3&limit=${limit}&t=${Date.now()}`);
-        if (!resp.ok) throw new Error('接口返回 ' + resp.status);
-        const data = await resp.json();
-        if (!data.ok) throw new Error(data.error || '抓取失败');
-
-        // 用接口返回的数据更新缓存并重渲染
-        pl3ParityHistory = data.history || [];
-        pl3TrendHistory = data.history || [];
-        renderPl3Parity(pl3ParityHistory);
-        renderPl3Trend(pl3TrendHistory);
-
-        // 同时刷新最新开奖号码区域
-        if (data.latest) {
-            try { renderLatest(data.latest); } catch (e) { /* 忽略 */ }
-        }
-    } catch (e) {
-        const msg = `⚠️ 抓取失败：${e.message}。请确认已用「python serve.py」启动本地服务器（普通 http.server 无爬取接口）。`;
-        if (hint) { hint.innerHTML = msg; }
-        else if (btn) { btn.textContent = '❌ 抓取失败，点此重试'; btn.disabled = false; }
-        if (btn) { btn.disabled = false; btn.textContent = '📥 重新补充数据'; }
-    }
+    return fetchParityMore('pl3', limit);
 }
+
+
 
 // ====== 旋转矩阵模块（大乐透）======
 
