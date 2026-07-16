@@ -468,6 +468,30 @@ function renderParityPanel(type, history) {
         }
     });
 
+    // 每位 0-9 号码频次统计
+    const posFreq = positions.map(() => new Array(10).fill(0));
+    recent.forEach(item => {
+        const num = item.num || [];
+        for (let i = 0; i < n; i++) {
+            const d = num[i];
+            if (d != null && d >= 0 && d <= 9) posFreq[i][d]++;
+        }
+    });
+    const freqMax = Math.max(...posFreq.flat()) || 1;
+    const freqRows = positions.map((name, i) => {
+        const cells = Array.from({ length: 10 }, (_, d) => {
+            const cnt = posFreq[i][d];
+            const pct = total ? cnt / total * 100 : 0;
+            const h = cnt / freqMax * 100; // 柱高占比
+            return `<div class="freq-cell" title="${name} ${d}：${cnt} 次（${pct.toFixed(1)}%）">
+                <div class="freq-bar" style="height:${h}%;"></div>
+                <span class="freq-cnt">${cnt}</span>
+                <span class="freq-num">${d}</span>
+            </div>`;
+        }).join('');
+        return `<div class="freq-row"><div class="freq-label">${name}</div><div class="freq-cells">${cells}</div></div>`;
+    }).join('');
+
     // 组合统计（动态生成 keys）
     const comboKeys = genComboKeys(dim, n);
     const comboCount = {};
@@ -567,6 +591,11 @@ function renderParityPanel(type, history) {
                 <span class="legend-item"><i class="dot ${dim.aClass}-dot"></i>${dim.legendA}</span>
                 <span class="legend-item"><i class="dot ${dim.bClass}-dot"></i>${dim.legendB}</span>
             </div>
+        </div>
+        <div class="parity-freq">
+            <h3>🔢 各位置号码频次（共 ${total} 期）</h3>
+            <p class="combo-desc">每位 0-9 出现次数统计，柱高反映相对频率，鼠标悬停查看精确占比。理论均匀分布为每位每个号码 ${total ? (total / 10).toFixed(1) : 0} 次（${total ? (100 / 10).toFixed(1) : 0}%）。</p>
+            ${freqRows}
         </div>
         <div class="parity-combo">
             <h3>🎲 ${n}位${dim.name}组合占比（共 ${comboKeys.length} 种）</h3>
