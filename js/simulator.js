@@ -663,10 +663,11 @@ async function fetchParityMore(type, limit) {
 
         PARITY_STATE[type].history = data.history || [];
         TREND_STATE[type].history = data.history || [];
+        TRANS_STATE[type].history = data.history || [];
         renderParityPanel(type, PARITY_STATE[type].history);
         renderTrendPanel(type, TREND_STATE[type].history);
         renderRoadTrend(type, TREND_STATE[type].history);
-        renderTrans(type, PARITY_STATE[type].history);
+        renderTrans(type, TRANS_STATE[type].history);
 
         if (data.latest) {
             try { renderLatest(data.latest); } catch (e) { /* 忽略 */ }
