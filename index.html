@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>摇号模拟器 · 大乐透 / 双色球 / 排列三</title>
-    <link rel="stylesheet" href="css/style.css?v=20260724">
+    <link rel="stylesheet" href="css/style.css?v=20260726">
 
 </head>
 <body>
@@ -153,6 +153,8 @@
                         <option value="50">最近 50 期</option>
                         <option value="80">最近 80 期</option>
                         <option value="100">最近 100 期</option>
+                        <option value="300">最近 300 期</option>
+                        <option value="500">最近 500 期</option>
                     </select>
                 </label>
                 <div class="trend-pos-switch">
@@ -184,6 +186,8 @@
                         <option value="50">最近 50 期</option>
                         <option value="80">最近 80 期</option>
                         <option value="100">最近 100 期</option>
+                        <option value="300">最近 300 期</option>
+                        <option value="500">最近 500 期</option>
                     </select>
                 </label>
             </div>
@@ -231,6 +235,8 @@
                         <option value="50">最近 50 期</option>
                         <option value="80">最近 80 期</option>
                         <option value="100">最近 100 期</option>
+                        <option value="300">最近 300 期</option>
+                        <option value="500">最近 500 期</option>
                     </select>
                 </label>
                 <button type="button" class="btn btn-secondary" id="pl5TrendDraw">✏️ 进入画线</button>
@@ -243,6 +249,39 @@
                     <thead></thead>
                     <tbody></tbody>
                 </table>
+            </div>
+        </section>
+
+        <!-- 排列五 012路 走势图 -->
+        <section class="trend-panel card" id="pl5RoadTrendPanel" style="display:none">
+            <h2>🛤️ 排列五 012路 走势图</h2>
+            <p class="matrix-tip">显示最近 N 期 <strong>万位 / 千位 / 百位 / 十位 / 个位</strong> 的 012 路走势。0路=0,3,6,9 · 1路=1,4,7 · 2路=2,5,8（红圈为当期路数，红线为趋势线）。</p>
+            <div class="trend-toolbar">
+                <label class="trend-limit-label">期数：
+                    <select id="pl5RoadTrendLimit">
+                        <option value="30" selected>最近 30 期</option>
+                        <option value="50">最近 50 期</option>
+                        <option value="80">最近 80 期</option>
+                        <option value="100">最近 100 期</option>
+                        <option value="300">最近 300 期</option>
+                        <option value="500">最近 500 期</option>
+                    </select>
+                </label>
+            </div>
+            <div class="trend-grid-wrap" id="pl5RoadTrendWrap">
+                <table class="trend-grid trend-road-grid" id="pl5RoadTrendGrid">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 排列五 前后期数字转移统计 -->
+        <section class="parity-panel card" id="pl5TransPanel" style="display:none">
+            <h2>🔁 排列五 前后期数字转移统计</h2>
+            <p class="matrix-tip">统计指定期数内，<strong>上期某位数字 → 下期同位数字</strong>的转移分布。例如上万位为 3，则统计历史上所有"万位=3"的期次，看其下一期万位出现了哪些数字。默认以上期为最新一期号码。</p>
+            <div id="pl5TransContent">
+                <p class="loading">加载中...</p>
             </div>
         </section>
 
@@ -265,6 +304,6 @@
         </footer>
     </div>
 
-    <script src="js/simulator.js?v=20260725"></script>
+    <script src="js/simulator.js?v=20260727"></script>
 </body>
 </html>

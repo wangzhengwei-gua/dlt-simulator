@@ -319,8 +319,11 @@ function updateMatrixVisibility() {
     document.getElementById('pl3TrendPanel').style.display = pl3Show ? '' : 'none';
     document.getElementById('pl3RoadTrendPanel').style.display = pl3Show ? '' : 'none';
     document.getElementById('pl3TransPanel').style.display = pl3Show ? '' : 'none';
-    document.getElementById('pl5ParityPanel').style.display = currentType === 'pl5' ? '' : 'none';
-    document.getElementById('pl5TrendPanel').style.display = currentType === 'pl5' ? '' : 'none';
+    const pl5Show = currentType === 'pl5';
+    document.getElementById('pl5ParityPanel').style.display = pl5Show ? '' : 'none';
+    document.getElementById('pl5TrendPanel').style.display = pl5Show ? '' : 'none';
+    document.getElementById('pl5RoadTrendPanel').style.display = pl5Show ? '' : 'none';
+    document.getElementById('pl5TransPanel').style.display = pl5Show ? '' : 'none';
 }
 
 // 加载开奖数据
@@ -345,6 +348,8 @@ async function loadLotteryData() {
         renderPl3Trans(data.history || []);
         renderParityPanel('pl5', data.history || []);
         renderTrendPanel('pl5', data.history || []);
+        renderRoadTrend('pl5', data.history || []);
+        renderTrans('pl5', data.history || []);
     } catch (e) {
         latestContent.innerHTML = `<p class="loading">⚠️ 暂无${config.name}开奖数据</p>`;
         historyContent.innerHTML = `<p class="loading">⚠️ 暂无历史数据</p>`;
@@ -404,7 +409,7 @@ const PARITY_STATE = {
     pl3: { history: [], limit: 30, dimension: 'odd' },
     pl5: { history: [], limit: 30, dimension: 'odd' },
 };
-const PARITY_OPTIONS = [30, 50, 80, 100, 150];
+const PARITY_OPTIONS = [30, 50, 80, 100, 150, 300, 500];
 
 // 维度配置：a=满足条件的一方（奇/大），b=另一方（偶/小）
 const DIMENSIONS = {
@@ -660,6 +665,8 @@ async function fetchParityMore(type, limit) {
         TREND_STATE[type].history = data.history || [];
         renderParityPanel(type, PARITY_STATE[type].history);
         renderTrendPanel(type, TREND_STATE[type].history);
+        renderRoadTrend(type, TREND_STATE[type].history);
+        renderTrans(type, PARITY_STATE[type].history);
 
         if (data.latest) {
             try { renderLatest(data.latest); } catch (e) { /* 忽略 */ }
@@ -821,26 +828,29 @@ function renderPl3Trend(history) { return renderTrendPanel('pl3', history); }
 
 // ====== 排列三 012路 走势图 ======
 // 0路: 0,3,6,9  1路: 1,4,7  2路: 2,5,8
-const PL3_ROAD_LIMIT = { pl3: 30 };
+const PL3_ROAD_LIMIT = { pl3: 30, pl5: 30 };
 
-function renderPl3RoadTrend(history) {
-    if (currentType !== 'pl3') return;
-    const limitSel = document.getElementById('pl3RoadTrendLimit');
+function renderRoadTrend(type, history) {
+    if (currentType !== type) return;
+    const limitSel = document.getElementById(type + 'RoadTrendLimit');
     const limit = limitSel ? parseInt(limitSel.value, 10) || 30 : 30;
-    PL3_ROAD_LIMIT.pl3 = limit;
+    PL3_ROAD_LIMIT[type] = limit;
     const recent = (history || []).slice(0, limit);
     const items = [...recent].reverse();
-    const grid = document.getElementById('pl3RoadTrendGrid');
+    const grid = document.getElementById(type + 'RoadTrendGrid');
     if (!grid) return;
     const thead = grid.querySelector('thead');
     const tbody = grid.querySelector('tbody');
     if (!thead || !tbody) return;
 
-    // 表头：期号 | 0路 | 1路 | 2路 | 路数组合 | 和值
+    const positions = LOTTERY_CONFIGS[type].positions;
+    const nPos = positions.length;
+
+    // 表头：期号 | 各位的 012 路(显示号码) | 路数组合 | 开奖号
     let head = '<tr><th class="period-col">期号</th>';
-    head += '<th>0路<br><small>0,3,6,9</small></th>';
-    head += '<th>1路<br><small>1,4,7</small></th>';
-    head += '<th>2路<br><small>2,5,8</small></th>';
+    positions.forEach(p => {
+        head += `<th>${p}<br><small>${p.replace('位', '')}位</small></th>`;
+    });
     head += '<th>路数组合</th>';
     head += '<th>开奖号</th>';
     head += '</tr>';
@@ -850,19 +860,16 @@ function renderPl3RoadTrend(history) {
     items.forEach((item, rowIdx) => {
         const num = item.num || [];
         body += `<tr><td class="period-cell">${item.period || '--'}</td>`;
-        // 三列分别显示该位置的 012 路
-        for (let pos = 0; pos < 3; pos++) {
+        for (let pos = 0; pos < nPos; pos++) {
             const d = num[pos];
             const road = d % 3;
             body += `<td class="num-cell" data-pos="${pos}" data-row="${rowIdx}" data-col="${road}">`;
-            // 在对应路数位置显示号码
             body += `<span class="road-cell road-${road}">${d}</span>`;
             body += '</td>';
         }
-        // 路数组合：如 "012" 表示百位0路十位1路个位2路
-        const combo = num.map(d => d % 3).join('');
+        const combo = num.slice(0, nPos).map(d => d % 3).join('');
         body += `<td class="combo-cell">${combo}</td>`;
-        body += `<td class="draw-cell">${num.join(' ')}</td>`;
+        body += `<td class="draw-cell">${num.slice(0, nPos).join(' ')}</td>`;
         body += '</tr>';
     });
 
@@ -871,19 +878,25 @@ function renderPl3RoadTrend(history) {
     const predictPeriod = (lastPeriod && !isNaN(lastPeriod)) ? (lastPeriod + 1) : '';
     const predictRowIdx = items.length;
     body += `<tr class="predict-row"><td class="period-cell predict-cell">🔮 ${predictPeriod}<small>预测</small></td>`;
-    for (let pos = 0; pos < 3; pos++) {
+    for (let pos = 0; pos < nPos; pos++) {
         body += `<td class="num-cell" data-pos="${pos}" data-row="${predictRowIdx}" data-col="-1" data-predict="1"><span class="road-cell road-predict">?</span></td>`;
     }
-    body += `<td class="combo-cell">???</td>`;
-    body += `<td class="draw-cell">- - -</td>`;
+    body += `<td class="combo-cell">${'?' .repeat(nPos)}</td>`;
+    body += `<td class="draw-cell">${'- '.repeat(nPos).trim()}</td>`;
     body += '</tr>';
 
     tbody.innerHTML = body;
 }
 
-// ====== 排列三 前后期数字转移统计 ======
-const TRANS_STATE = { pl3: { history: [], limit: 30, prevNum: null } };
-const TRANS_OPTIONS = [30, 50, 80, 100, 200];
+// 兼容旧调用
+function renderPl3RoadTrend(history) { return renderRoadTrend('pl3', history); }
+
+// ====== 排列三/五 前后期数字转移统计 ======
+const TRANS_STATE = {
+    pl3: { history: [], limit: 30, prevNum: null },
+    pl5: { history: [], limit: 30, prevNum: null },
+};
+const TRANS_OPTIONS = [30, 50, 80, 100, 200, 300, 500];
 
 function buildTransition(history, pos, limit) {
     // history[0] 最新, "下期"=时间更晚的一期(索引更小)
@@ -908,28 +921,28 @@ function buildTransition(history, pos, limit) {
     return trans;
 }
 
-function renderPl3Trans(history) {
-    const panel = document.getElementById('pl3TransContent');
+function renderTrans(type, history) {
+    const panel = document.getElementById(type + 'TransContent');
     if (!panel) return;
-    if (currentType !== 'pl3') { panel.innerHTML = ''; return; }
+    if (currentType !== type) { panel.innerHTML = ''; return; }
 
-    const s = TRANS_STATE.pl3;
+    const s = TRANS_STATE[type];
     s.history = history || [];
     const maxAvail = s.history.length;
     const limit = Math.min(s.limit, maxAvail);
-    // 只取最近 limit 期做转移统计（注意：转移对数为 limit-1）
     if (maxAvail < 2) {
         panel.innerHTML = `<p class="loading">历史数据不足，至少需要 2 期</p>`;
         return;
     }
 
-    const positions = ['百位', '十位', '个位'];
+    const positions = LOTTERY_CONFIGS[type].positions;
+    const nPos = positions.length;
     const totalPairs = Math.min(limit, maxAvail - 1);
 
     // 默认上期号码 = 最新一期
-    if (!s.prevNum || s.prevNum.length !== 3) {
+    if (!s.prevNum || s.prevNum.length !== nPos) {
         const latest = s.history[0];
-        s.prevNum = latest ? (latest.num || [0, 0, 0]).slice() : [0, 0, 0];
+        s.prevNum = latest ? (latest.num || new Array(nPos).fill(0)).slice() : new Array(nPos).fill(0);
     }
     const prevNum = s.prevNum;
 
@@ -975,16 +988,16 @@ function renderPl3Trans(history) {
         const d = prevNum[pos];
         const row = trans[d] || new Array(10).fill(0);
         const rowSum = row.reduce((a, b) => a + b, 0);
-        const occurrence = occurrenceCount[d];  // 80 期内该位=d 的总出现次数
+        const occurrence = occurrenceCount[d];
         const maxCnt = Math.max(...row, 1);
         const ranked = Array.from({ length: 10 }, (_, n) => ({ n, cnt: row[n] }))
             .sort((a, b) => b.cnt - a.cnt);
         const top3 = ranked.slice(0, 3).filter(x => x.cnt > 0)
             .map(x => `${x.n}<small>${x.cnt}次 ${rowSum > 0 ? (x.cnt / rowSum * 100).toFixed(0) : 0}%</small>`).join(' ');
 
-        // 逐期明细：列出最近 limit 期内, 该位=d 的每一期及其"下一期"该位号码
+        // 逐期明细
         const details = [];
-        for (let i = L0 - 1; i >= 0; i--) {  // 从早到晚排列
+        for (let i = L0 - 1; i >= 0; i--) {
             if (s.history[i].num[pos] !== d) continue;
             const cur = s.history[i];
             const next = i - 1 >= 0 ? s.history[i - 1] : null;
@@ -1000,7 +1013,6 @@ function renderPl3Trans(history) {
                     nextVal: nextNum,
                 });
             } else {
-                // 最新一期, 无下一期
                 details.push({
                     period: cur.period,
                     date: cur.date,
@@ -1073,7 +1085,7 @@ function renderPl3Trans(history) {
     panel.innerHTML = `
         <div class="trans-toolbar" style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:10px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;">
             <label class="parity-limit-label" style="display:inline-flex;align-items:center;gap:8px;font-size:0.88rem;color:rgba(255,255,255,0.85);">统计期数：
-                <select id="pl3TransLimit" style="background:rgba(245,175,25,0.12);color:#ffd98a;border:1px solid rgba(245,175,25,0.4);border-radius:8px;padding:6px 12px;font-size:0.85rem;font-weight:bold;cursor:pointer;outline:none;">${opts}</select>
+                <select id="${type}TransLimit" style="background:rgba(245,175,25,0.12);color:#ffd98a;border:1px solid rgba(245,175,25,0.4);border-radius:8px;padding:6px 12px;font-size:0.85rem;font-weight:bold;cursor:pointer;outline:none;">${opts}</select>
             </label>
             <span class="parity-avail" style="font-size:0.8rem;color:rgba(255,255,255,0.55);">可用历史 <b style="color:#43e97b;">${maxAvail}</b> 期 · 转移对数 <b style="color:#43e97b;">${totalPairs}</b></span>
         </div>
@@ -1086,11 +1098,11 @@ function renderPl3Trans(history) {
     `;
 
     // 绑定期数选择
-    const limitSel = document.getElementById('pl3TransLimit');
+    const limitSel = document.getElementById(type + 'TransLimit');
     if (limitSel) {
         limitSel.addEventListener('change', e => {
             s.limit = parseInt(e.target.value, 10) || 30;
-            renderPl3Trans(s.history);
+            renderTrans(type, s.history);
         });
     }
     // 绑定号码输入
@@ -1102,10 +1114,13 @@ function renderPl3Trans(history) {
             e.target.value = v;
             const pos = parseInt(e.target.dataset.pos, 10);
             s.prevNum[pos] = v;
-            renderPl3Trans(s.history);
+            renderTrans(type, s.history);
         });
     });
 }
+
+// 兼容旧调用
+function renderPl3Trans(history) { return renderTrans('pl3', history); }
 
 function onTrendCellClick(type, td) {
     const s = TREND_STATE[type];
@@ -1314,13 +1329,15 @@ function setupTrendControls() {
         }
     });
 
-    // 排列三 012路走势图 期数切换
-    const roadLimitSel = document.getElementById('pl3RoadTrendLimit');
-    if (roadLimitSel) {
-        roadLimitSel.addEventListener('change', () => {
-            renderPl3RoadTrend(TREND_STATE.pl3.history);
-        });
-    }
+    // 排列三/五 012路走势图 期数切换
+    ['pl3', 'pl5'].forEach(type => {
+        const roadLimitSel = document.getElementById(type + 'RoadTrendLimit');
+        if (roadLimitSel) {
+            roadLimitSel.addEventListener('change', () => {
+                renderRoadTrend(type, TREND_STATE[type].history);
+            });
+        }
+    });
 }
 
 // 按需抓取更多排列三期数并刷新奇偶比分析
