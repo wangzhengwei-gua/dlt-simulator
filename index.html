@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>摇号模拟器 · 大乐透 / 双色球 / 排列三</title>
-    <link rel="stylesheet" href="css/style.css?v=20260716">
+    <link rel="stylesheet" href="css/style.css?v=20260724">
+
 </head>
 <body>
     <div class="bg-decoration">
@@ -141,16 +142,11 @@
             </div>
         </section>
 
-        <!-- 排列三 走势图（百/十/个位 + 手动画线） -->
+        <!-- 排列三 走势图（百/十/个位 同时显示 + 手动画线） -->
         <section class="trend-panel card" id="pl3TrendPanel" style="display:none">
             <h2>📈 排列三 走势图</h2>
-            <p class="matrix-tip">显示最近 N 期 <strong>百位 / 十位 / 个位</strong> 的数字走势（红圈为当期号码，红线为趋势线）。可切换位置与期数，并可手动画线辅助分析。</p>
+            <p class="matrix-tip">显示最近 N 期 <strong>百位 / 十位 / 个位</strong> 的数字走势（红圈为当期号码，红/蓝/紫线为三位置趋势线），<strong>三位置同一行横向并排</strong>。可手动画线辅助分析。</p>
             <div class="trend-toolbar">
-                <div class="trend-pos-switch">
-                    <button type="button" class="trend-pos-btn active" data-pos="0">百位</button>
-                    <button type="button" class="trend-pos-btn" data-pos="1">十位</button>
-                    <button type="button" class="trend-pos-btn" data-pos="2">个位</button>
-                </div>
                 <label class="trend-limit-label">期数：
                     <select id="pl3TrendLimit">
                         <option value="30" selected>最近 30 期</option>
@@ -159,6 +155,11 @@
                         <option value="100">最近 100 期</option>
                     </select>
                 </label>
+                <div class="trend-pos-switch">
+                    <button type="button" class="trend-pos-btn active" data-pos="0">画线: 百位</button>
+                    <button type="button" class="trend-pos-btn" data-pos="1">画线: 十位</button>
+                    <button type="button" class="trend-pos-btn" data-pos="2">画线: 个位</button>
+                </div>
                 <button type="button" class="btn btn-secondary" id="pl3TrendDraw">✏️ 进入画线</button>
                 <button type="button" class="btn btn-secondary" id="pl3TrendClear">🗑️ 清空画线</button>
             </div>
@@ -169,6 +170,37 @@
                     <thead></thead>
                     <tbody></tbody>
                 </table>
+            </div>
+        </section>
+
+        <!-- 排列三 012路 走势图 -->
+        <section class="trend-panel card" id="pl3RoadTrendPanel" style="display:none">
+            <h2>🛤️ 排列三 012路 走势图</h2>
+            <p class="matrix-tip">显示最近 N 期 <strong>百位 / 十位 / 个位</strong> 的 012 路走势。0路=0,3,6,9 · 1路=1,4,7 · 2路=2,5,8（红圈为当期路数，红线为趋势线）。</p>
+            <div class="trend-toolbar">
+                <label class="trend-limit-label">期数：
+                    <select id="pl3RoadTrendLimit">
+                        <option value="30" selected>最近 30 期</option>
+                        <option value="50">最近 50 期</option>
+                        <option value="80">最近 80 期</option>
+                        <option value="100">最近 100 期</option>
+                    </select>
+                </label>
+            </div>
+            <div class="trend-grid-wrap" id="pl3RoadTrendWrap">
+                <table class="trend-grid trend-road-grid" id="pl3RoadTrendGrid">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 排列三 前后期数字转移统计 -->
+        <section class="parity-panel card" id="pl3TransPanel" style="display:none">
+            <h2>🔁 排列三 前后期数字转移统计</h2>
+            <p class="matrix-tip">统计指定期数内，<strong>上期某位数字 → 下期同位数字</strong>的转移分布。例如上期百位为 3，则统计历史上所有"百位=3"的期次，看其下一期百位出现了哪些数字。默认以上期为最新一期号码。</p>
+            <div id="pl3TransContent">
+                <p class="loading">加载中...</p>
             </div>
         </section>
 
@@ -233,6 +265,6 @@
         </footer>
     </div>
 
-    <script src="js/simulator.js?v=20260716"></script>
+    <script src="js/simulator.js?v=20260725"></script>
 </body>
 </html>

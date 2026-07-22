@@ -808,6 +808,68 @@ footer {
 
 .pl3-combo b { color: #43e97b; }
 
+/* 奇偶比/大小比预测展示 */
+.pl3-ratio-predict {
+    margin-top: 10px;
+    padding: 12px;
+    background: rgba(100, 180, 255, 0.08);
+    border: 1px solid rgba(100, 180, 255, 0.2);
+    border-radius: 8px;
+}
+
+.ratio-predict-title {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: rgba(100, 180, 255, 0.9);
+    margin-bottom: 8px;
+}
+
+.ratio-predict-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.ratio-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.ratio-tag b { font-size: 0.95rem; }
+
+.ratio-tag.ratio-odd {
+    background: rgba(255, 159, 67, 0.15);
+    border: 1px solid rgba(255, 159, 67, 0.35);
+    color: rgba(255, 200, 130, 0.95);
+}
+
+.ratio-tag.ratio-odd b { color: #ff9f43; }
+
+.ratio-tag.ratio-big {
+    background: rgba(100, 180, 255, 0.15);
+    border: 1px solid rgba(100, 180, 255, 0.35);
+    color: rgba(150, 200, 255, 0.95);
+}
+
+.ratio-tag.ratio-big b { color: #64b4ff; }
+
+.ratio-streak {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.ratio-predict-detail {
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.6;
+    margin-top: 2px;
+}
+
 /* 回测报告 */
 .backtest-report { margin-bottom: 14px; }
 
@@ -1875,6 +1937,31 @@ footer {
     border-color: #1f1f4a;
 }
 
+/* pl3 双行表头：位置组标题行 + 数字行 */
+.trend-grid thead tr:first-child th.pos-group-header {
+    font-size: 0.72rem;
+    color: #43e97b;
+    background: #1a1a3e;
+    box-shadow: inset 0 -1px 0 rgba(67, 233, 123, 0.3);
+    height: 24px;
+}
+
+.trend-grid thead tr:nth-child(2) th {
+    top: 24px;
+    height: 28px;
+    z-index: 3;
+}
+
+.trend-grid thead tr:nth-child(2) th.period-col {
+    z-index: 5;
+}
+
+/* 位置组分隔：十位、个位区域首列加左边框 */
+.trend-grid td.num-cell.pos-group-start,
+.trend-grid thead th.pos-group-start {
+    border-left: 2px solid rgba(67, 233, 123, 0.35);
+}
+
 .trend-grid .num-cell { cursor: pointer; transition: background 0.15s; }
 
 /* 所有 num-cell 默认显示虚化球（半透明白） */
@@ -1990,3 +2077,348 @@ footer {
     background: rgba(67, 233, 123, 0.35) !important;
     box-shadow: inset 0 0 0 2px #43e97b;
 }
+
+/* 走势图段标题行（百位/十位/个位分隔） */
+.trend-grid tr.trend-section-row td.section-cell {
+    background: linear-gradient(90deg, rgba(67, 233, 123, 0.18), rgba(56, 249, 215, 0.1));
+    color: #43e97b;
+    font-weight: bold;
+    font-size: 0.82rem;
+    text-align: left;
+    padding: 8px 14px;
+    border-top: 2px solid rgba(67, 233, 123, 0.4);
+    border-bottom: 1px solid rgba(67, 233, 123, 0.25);
+    letter-spacing: 1px;
+    height: 28px;
+}
+
+/* 012路 走势图 */
+.trend-road-grid th small {
+    font-size: 0.62rem;
+    font-weight: normal;
+    color: rgba(255, 217, 138, 0.7);
+}
+
+.trend-road-grid .road-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 0.85rem;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* 0路：蓝色系 */
+.trend-road-grid .road-cell.road-0 {
+    background: radial-gradient(circle at 30% 30%, #3b82f6, #1d4ed8);
+}
+
+/* 1路：橙色系 */
+.trend-road-grid .road-cell.road-1 {
+    background: radial-gradient(circle at 30% 30%, #f5af19, #d97706);
+}
+
+/* 2路：绿色系 */
+.trend-road-grid .road-cell.road-2 {
+    background: radial-gradient(circle at 30% 30%, #43e97b, #38f9d7);
+    color: #1a1a2e;
+}
+
+/* 预测行路数 */
+.trend-road-grid .road-cell.road-predict {
+    background: radial-gradient(circle at 30% 30%, rgba(168, 85, 247, 0.6), rgba(168, 85, 247, 0.25));
+    color: rgba(255, 255, 255, 0.7);
+    border: 1px dashed rgba(168, 85, 247, 0.5);
+}
+
+.trend-road-grid .combo-cell {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-weight: bold;
+    color: #ffd98a;
+    font-size: 0.82rem;
+    letter-spacing: 1px;
+}
+
+.trend-road-grid .draw-cell {
+    font-family: 'Consolas', 'Courier New', monospace;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+}
+
+/* 012路走势图列宽 */
+.trend-road-grid th,
+.trend-road-grid td {
+    min-width: 48px;
+}
+
+.trend-road-grid td.combo-cell,
+.trend-road-grid td.draw-cell {
+    min-width: 64px;
+}
+
+/* ====== 排列三 前后期数字转移统计 ====== */
+.trans-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.trans-prev-input {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    background: rgba(67, 233, 123, 0.08);
+    border: 1px solid rgba(67, 233, 123, 0.25);
+    border-radius: 10px;
+}
+
+.trans-prev-label {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.trans-num-input {
+    width: 54px;
+    padding: 8px 4px;
+    background: rgba(67, 233, 123, 0.12);
+    color: #7df5b0;
+    border: 1px solid rgba(67, 233, 123, 0.4);
+    border-radius: 8px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-align: center;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.trans-num-input:focus {
+    border-color: #43e97b;
+    box-shadow: 0 0 0 2px rgba(67, 233, 123, 0.25);
+}
+
+.trans-num-input::-webkit-inner-spin-button,
+.trans-num-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.trans-prev-hint {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.trans-section {
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    margin-bottom: 16px;
+}
+
+.trans-section h3 {
+    font-size: 0.95rem;
+    margin-bottom: 14px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.trans-section h3 b {
+    color: #43e97b;
+    font-size: 1.1rem;
+}
+
+/* 柱状图 */
+.trans-bars {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+    margin-bottom: 12px;
+    padding: 10px 4px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+}
+
+.trans-bar-cell {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 110px;
+    justify-content: flex-end;
+}
+
+.trans-bar-cnt {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.75);
+    margin-bottom: 2px;
+}
+
+.trans-bar-wrap {
+    width: 100%;
+    max-width: 40px;
+    height: 70px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.trans-bar {
+    width: 100%;
+    background: linear-gradient(180deg, #4facfe, #0072e3);
+    border-radius: 4px 4px 0 0;
+    min-height: 2px;
+    transition: height 0.3s ease;
+    opacity: 0.7;
+}
+
+.trans-bar.top {
+    background: linear-gradient(180deg, #43e97b, #38f9d7);
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(67, 233, 123, 0.4);
+}
+
+.trans-bar-num {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 4px;
+}
+
+.trans-bar-num.top {
+    color: #43e97b;
+}
+
+.trans-top {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 8px 12px;
+    background: rgba(67, 233, 123, 0.1);
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.trans-top small {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.55);
+    font-weight: normal;
+}
+
+/* 转移矩阵表 */
+.trans-matrix-details {
+    margin-top: 10px;
+}
+
+.trans-matrix-details summary {
+    cursor: pointer;
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 6px 0;
+    user-select: none;
+}
+
+.trans-matrix-details summary:hover {
+    color: #43e97b;
+}
+
+.trans-table-scroll {
+    overflow-x: auto;
+    margin-top: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+}
+
+.trans-matrix-table {
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    width: max-content;
+}
+
+.trans-matrix-table th,
+.trans-matrix-table td {
+    padding: 5px 8px;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+}
+
+.trans-matrix-table th {
+    color: #43e97b;
+    font-weight: bold;
+    background: rgba(67, 233, 123, 0.12);
+}
+
+.trans-matrix-table td small {
+    font-size: 0.62rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.trans-matrix-table .trans-row-head {
+    font-weight: bold;
+    color: #43e97b;
+    background: rgba(67, 233, 123, 0.08);
+}
+
+.trans-matrix-table .trans-row-sum {
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.trans-matrix-table .trans-zero {
+    color: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 600px) {
+    .trans-num-input { width: 44px; font-size: 1rem; }
+    .trans-bar-wrap { height: 56px; }
+    .trans-bar-cell { height: 92px; }
+    .trans-bars { gap: 3px; }
+}
+
+/* 逐期明细表 */
+.trans-detail-table th,
+.trans-detail-table td {
+    padding: 7px 8px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+}
+
+.trans-detail-table th {
+    color: #43e97b;
+    font-weight: bold;
+    background: rgba(67, 233, 123, 0.12);
+}
+
+.trans-detail-table tr.trans-hit-top {
+    background: rgba(67, 233, 123, 0.1);
+}
+
+.trans-detail-table tr.trans-hit-top:hover {
+    background: rgba(67, 233, 123, 0.2);
+}
+
+.trans-detail-table tr:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.trans-occurrence {
+    line-height: 1.7;
+}
+

@@ -317,6 +317,8 @@ function updateMatrixVisibility() {
     if (!pl3Show) document.getElementById('pl3Panel').style.display = 'none';
     document.getElementById('pl3ParityPanel').style.display = pl3Show ? '' : 'none';
     document.getElementById('pl3TrendPanel').style.display = pl3Show ? '' : 'none';
+    document.getElementById('pl3RoadTrendPanel').style.display = pl3Show ? '' : 'none';
+    document.getElementById('pl3TransPanel').style.display = pl3Show ? '' : 'none';
     document.getElementById('pl5ParityPanel').style.display = currentType === 'pl5' ? '' : 'none';
     document.getElementById('pl5TrendPanel').style.display = currentType === 'pl5' ? '' : 'none';
 }
@@ -339,6 +341,8 @@ async function loadLotteryData() {
         renderHistory(data.history || []);
         renderPl3Parity(data.history || []);
         renderPl3Trend(data.history || []);
+        renderPl3RoadTrend(data.history || []);
+        renderPl3Trans(data.history || []);
         renderParityPanel('pl5', data.history || []);
         renderTrendPanel('pl5', data.history || []);
     } catch (e) {
@@ -721,32 +725,85 @@ function renderTrendPanel(type, history) {
     const tbody = grid.querySelector('tbody');
     if (!thead || !tbody) return;
 
-    let head = '<tr><th class="period-col">期号</th>';
-    for (let n = 0; n < 10; n++) head += `<th>${n}</th>`;
-    head += '</tr>';
+    const posLabels = type === 'pl3' ? ['百位', '十位', '个位'] : ['万位', '千位', '百位', '十位', '个位'];
+
+    // pl3: 百/十/个位同一行横向并排显示；pl5: 单段切换
+    const showAllPos = (type === 'pl3');
+
+    let head;
+    if (showAllPos) {
+        // pl3: 期号 | 百位0-9 | 十位0-9 | 个位0-9
+        head = '<tr><th class="period-col">期号</th>';
+        for (let pos = 0; pos < 3; pos++) {
+            const sep = pos > 0 ? ' pos-group-start' : '';
+            head += `<th class="pos-group-header${sep}" colspan="10">${posLabels[pos]}</th>`;
+        }
+        head += '</tr><tr><th class="period-col"></th>';
+        for (let pos = 0; pos < 3; pos++) {
+            for (let n = 0; n < 10; n++) {
+                const sep = (pos > 0 && n === 0) ? ' pos-group-start' : '';
+                head += `<th class="${sep.trim()}">${n}</th>`;
+            }
+        }
+        head += '</tr>';
+    } else {
+        head = '<tr><th class="period-col">期号</th>';
+        for (let n = 0; n < 10; n++) head += `<th>${n}</th>`;
+        head += '</tr>';
+    }
     thead.innerHTML = head;
 
     let body = '';
-    items.forEach((item, rowIdx) => {
-        const num = item.num || [];
-        const n = num[s.pos];
-        body += `<tr><td class="period-cell">${item.period || '--'}</td>`;
-        for (let col = 0; col < 10; col++) {
-            const hit = (n === col);
-            const cls = hit ? ' class="num-cell hit"' : ' class="num-cell"';
-            body += `<td${cls} data-row="${rowIdx}" data-col="${col}"><span>${col}</span></td>`;
+    if (showAllPos) {
+        // pl3: 每行 = 期号 + 百位10格 + 十位10格 + 个位10格
+        const lastPeriod = items.length > 0 ? parseInt(items[items.length - 1].period, 10) : null;
+        const predictPeriod = (lastPeriod && !isNaN(lastPeriod)) ? (lastPeriod + 1) : '';
+        items.forEach((item, rowIdx) => {
+            const num = item.num || [];
+            body += `<tr><td class="period-cell">${item.period || '--'}</td>`;
+            for (let pos = 0; pos < 3; pos++) {
+                const n = num[pos];
+                for (let col = 0; col < 10; col++) {
+                    const hit = (n === col);
+                    const sep = (pos > 0 && col === 0) ? ' pos-group-start' : '';
+                    const cls = hit ? ` class="num-cell hit${sep}"` : ` class="num-cell${sep}"`;
+                    body += `<td${cls} data-pos="${pos}" data-row="${rowIdx}" data-col="${col}"><span>${col}</span></td>`;
+                }
+            }
+            body += '</tr>';
+        });
+        // 预测行
+        const predictRowIdx = items.length;
+        body += `<tr class="predict-row"><td class="period-cell predict-cell">🔮 ${predictPeriod}<small>预测</small></td>`;
+        for (let pos = 0; pos < 3; pos++) {
+            for (let col = 0; col < 10; col++) {
+                const sep = (pos > 0 && col === 0) ? ' pos-group-start' : '';
+                body += `<td class="num-cell${sep}" data-pos="${pos}" data-row="${predictRowIdx}" data-col="${col}" data-predict="1"><span>${col}</span></td>`;
+            }
         }
         body += '</tr>';
-    });
-
-    const lastPeriod = items.length > 0 ? parseInt(items[items.length - 1].period, 10) : null;
-    const predictPeriod = (lastPeriod && !isNaN(lastPeriod)) ? (lastPeriod + 1) : '';
-    const predictRowIdx = items.length;
-    body += `<tr class="predict-row"><td class="period-cell predict-cell">🔮 ${predictPeriod}<small>预测</small></td>`;
-    for (let col = 0; col < 10; col++) {
-        body += `<td class="num-cell" data-row="${predictRowIdx}" data-col="${col}" data-predict="1"><span>${col}</span></td>`;
+    } else {
+        // pl5: 单段切换
+        items.forEach((item, rowIdx) => {
+            const num = item.num || [];
+            const n = num[s.pos];
+            body += `<tr><td class="period-cell">${item.period || '--'}</td>`;
+            for (let col = 0; col < 10; col++) {
+                const hit = (n === col);
+                const cls = hit ? ' class="num-cell hit"' : ' class="num-cell"';
+                body += `<td${cls} data-pos="${s.pos}" data-row="${rowIdx}" data-col="${col}"><span>${col}</span></td>`;
+            }
+            body += '</tr>';
+        });
+        const lastPeriod = items.length > 0 ? parseInt(items[items.length - 1].period, 10) : null;
+        const predictPeriod = (lastPeriod && !isNaN(lastPeriod)) ? (lastPeriod + 1) : '';
+        const predictRowIdx = items.length;
+        body += `<tr class="predict-row"><td class="period-cell predict-cell">🔮 ${predictPeriod}<small>预测</small></td>`;
+        for (let col = 0; col < 10; col++) {
+            body += `<td class="num-cell" data-pos="${s.pos}" data-row="${predictRowIdx}" data-col="${col}" data-predict="1"><span>${col}</span></td>`;
+        }
+        body += '</tr>';
     }
-    body += '</tr>';
 
     tbody.innerHTML = body;
 
@@ -762,9 +819,300 @@ function renderTrendPanel(type, history) {
 // 兼容旧调用
 function renderPl3Trend(history) { return renderTrendPanel('pl3', history); }
 
+// ====== 排列三 012路 走势图 ======
+// 0路: 0,3,6,9  1路: 1,4,7  2路: 2,5,8
+const PL3_ROAD_LIMIT = { pl3: 30 };
+
+function renderPl3RoadTrend(history) {
+    if (currentType !== 'pl3') return;
+    const limitSel = document.getElementById('pl3RoadTrendLimit');
+    const limit = limitSel ? parseInt(limitSel.value, 10) || 30 : 30;
+    PL3_ROAD_LIMIT.pl3 = limit;
+    const recent = (history || []).slice(0, limit);
+    const items = [...recent].reverse();
+    const grid = document.getElementById('pl3RoadTrendGrid');
+    if (!grid) return;
+    const thead = grid.querySelector('thead');
+    const tbody = grid.querySelector('tbody');
+    if (!thead || !tbody) return;
+
+    // 表头：期号 | 0路 | 1路 | 2路 | 路数组合 | 和值
+    let head = '<tr><th class="period-col">期号</th>';
+    head += '<th>0路<br><small>0,3,6,9</small></th>';
+    head += '<th>1路<br><small>1,4,7</small></th>';
+    head += '<th>2路<br><small>2,5,8</small></th>';
+    head += '<th>路数组合</th>';
+    head += '<th>开奖号</th>';
+    head += '</tr>';
+    thead.innerHTML = head;
+
+    let body = '';
+    items.forEach((item, rowIdx) => {
+        const num = item.num || [];
+        body += `<tr><td class="period-cell">${item.period || '--'}</td>`;
+        // 三列分别显示该位置的 012 路
+        for (let pos = 0; pos < 3; pos++) {
+            const d = num[pos];
+            const road = d % 3;
+            body += `<td class="num-cell" data-pos="${pos}" data-row="${rowIdx}" data-col="${road}">`;
+            // 在对应路数位置显示号码
+            body += `<span class="road-cell road-${road}">${d}</span>`;
+            body += '</td>';
+        }
+        // 路数组合：如 "012" 表示百位0路十位1路个位2路
+        const combo = num.map(d => d % 3).join('');
+        body += `<td class="combo-cell">${combo}</td>`;
+        body += `<td class="draw-cell">${num.join(' ')}</td>`;
+        body += '</tr>';
+    });
+
+    // 预测行
+    const lastPeriod = items.length > 0 ? parseInt(items[items.length - 1].period, 10) : null;
+    const predictPeriod = (lastPeriod && !isNaN(lastPeriod)) ? (lastPeriod + 1) : '';
+    const predictRowIdx = items.length;
+    body += `<tr class="predict-row"><td class="period-cell predict-cell">🔮 ${predictPeriod}<small>预测</small></td>`;
+    for (let pos = 0; pos < 3; pos++) {
+        body += `<td class="num-cell" data-pos="${pos}" data-row="${predictRowIdx}" data-col="-1" data-predict="1"><span class="road-cell road-predict">?</span></td>`;
+    }
+    body += `<td class="combo-cell">???</td>`;
+    body += `<td class="draw-cell">- - -</td>`;
+    body += '</tr>';
+
+    tbody.innerHTML = body;
+}
+
+// ====== 排列三 前后期数字转移统计 ======
+const TRANS_STATE = { pl3: { history: [], limit: 30, prevNum: null } };
+const TRANS_OPTIONS = [30, 50, 80, 100, 200];
+
+function buildTransition(history, pos, limit) {
+    // history[0] 最新, "下期"=时间更晚的一期(索引更小)
+    // 转移对: history[i](上期) -> history[i-1](下期)
+    //
+    // 为保证"最近 N 期中, 百位=X 的所有期次都参与统计":
+    //   上期窗口: 索引 0..N-1 (含最新期)
+    //   下期窗口: 索引 0..N-1 (含最新期)
+    //   但"上期=索引0"时, "下期=索引-1"不存在, 跳过
+    //
+    // 用户语义"在最近 80 期中, 上期=306 时下期如何":
+    //   指 80 期窗口内 306 出现的位置(0..79), 它们的"下一期"(时间更晚的)百位
+    //   第 0 期(最新)的下一期不在数据中, 自然被排除 (符合直觉)
+    const trans = Array.from({ length: 10 }, () => new Array(10).fill(0));
+    const L = Math.min(limit, history.length);
+    for (let i = 0; i < L; i++) {
+        if (i - 1 < 0) continue;  // 第 0 期没有"下一期", 跳过
+        const prev = history[i].num[pos];
+        const nxt = history[i - 1].num[pos];
+        if (prev >= 0 && prev <= 9 && nxt >= 0 && nxt <= 9) trans[prev][nxt]++;
+    }
+    return trans;
+}
+
+function renderPl3Trans(history) {
+    const panel = document.getElementById('pl3TransContent');
+    if (!panel) return;
+    if (currentType !== 'pl3') { panel.innerHTML = ''; return; }
+
+    const s = TRANS_STATE.pl3;
+    s.history = history || [];
+    const maxAvail = s.history.length;
+    const limit = Math.min(s.limit, maxAvail);
+    // 只取最近 limit 期做转移统计（注意：转移对数为 limit-1）
+    if (maxAvail < 2) {
+        panel.innerHTML = `<p class="loading">历史数据不足，至少需要 2 期</p>`;
+        return;
+    }
+
+    const positions = ['百位', '十位', '个位'];
+    const totalPairs = Math.min(limit, maxAvail - 1);
+
+    // 默认上期号码 = 最新一期
+    if (!s.prevNum || s.prevNum.length !== 3) {
+        const latest = s.history[0];
+        s.prevNum = latest ? (latest.num || [0, 0, 0]).slice() : [0, 0, 0];
+    }
+    const prevNum = s.prevNum;
+
+    // 期数选项
+    const opts = TRANS_OPTIONS.map(v => {
+        const sel = v === s.limit ? ' selected' : '';
+        const note = v > maxAvail ? '（数据不足）' : '';
+        return `<option value="${v}"${sel}>最近 ${v} 期${note}</option>`;
+    }).join('');
+
+    // 上期号码输入
+    const prevInput = prevNum.map((d, i) =>
+        `<input type="number" class="trans-num-input" data-pos="${i}" min="0" max="9" value="${d}">`
+    ).join('');
+
+    // 各位转移表 + 指定上期号码分布
+    const sections = positions.map((posName, pos) => {
+        const trans = buildTransition(s.history, pos, limit);
+
+        // 在最近 limit 期中，该位数字 d 总共出现的次数
+        const occurrenceCount = new Array(10).fill(0);
+        const L0 = Math.min(limit, s.history.length);
+        for (let i = 0; i < L0; i++) {
+            const v = s.history[i].num[pos];
+            if (v >= 0 && v <= 9) occurrenceCount[v]++;
+        }
+
+        // 转移矩阵表
+        const matrixHead = '<tr><th>上期\\下期</th>' +
+            Array.from({ length: 10 }, (_, d) => `<th>${d}</th>`).join('') + '<th>合计</th></tr>';
+        const matrixBody = Array.from({ length: 10 }, (_, prev) => {
+            const rowSum = trans[prev].reduce((a, b) => a + b, 0);
+            const cells = Array.from({ length: 10 }, (_, nxt) => {
+                const cnt = trans[prev][nxt];
+                const pct = rowSum > 0 ? (cnt / rowSum * 100) : 0;
+                const cls = cnt === 0 ? ' trans-zero' : '';
+                return `<td class="${cls.trim()}" title="${posName} 上期=${prev} → 下期=${nxt}：${cnt} 次（${pct.toFixed(1)}%）">${cnt}${cnt > 0 ? `<br><small>${pct.toFixed(0)}%</small>` : ''}</td>`;
+            }).join('');
+            return `<tr><td class="trans-row-head">${prev}</td>${cells}<td class="trans-row-sum">${rowSum}</td></tr>`;
+        }).join('');
+
+        // 指定上期号码 d 的下期分布（柱状）
+        const d = prevNum[pos];
+        const row = trans[d] || new Array(10).fill(0);
+        const rowSum = row.reduce((a, b) => a + b, 0);
+        const occurrence = occurrenceCount[d];  // 80 期内该位=d 的总出现次数
+        const maxCnt = Math.max(...row, 1);
+        const ranked = Array.from({ length: 10 }, (_, n) => ({ n, cnt: row[n] }))
+            .sort((a, b) => b.cnt - a.cnt);
+        const top3 = ranked.slice(0, 3).filter(x => x.cnt > 0)
+            .map(x => `${x.n}<small>${x.cnt}次 ${rowSum > 0 ? (x.cnt / rowSum * 100).toFixed(0) : 0}%</small>`).join(' ');
+
+        // 逐期明细：列出最近 limit 期内, 该位=d 的每一期及其"下一期"该位号码
+        const details = [];
+        for (let i = L0 - 1; i >= 0; i--) {  // 从早到晚排列
+            if (s.history[i].num[pos] !== d) continue;
+            const cur = s.history[i];
+            const next = i - 1 >= 0 ? s.history[i - 1] : null;
+            if (next) {
+                const nextNum = next.num[pos];
+                details.push({
+                    period: cur.period,
+                    date: cur.date,
+                    curNums: cur.num,
+                    nextPeriod: next.period,
+                    nextDate: next.date,
+                    nextNums: next.num,
+                    nextVal: nextNum,
+                });
+            } else {
+                // 最新一期, 无下一期
+                details.push({
+                    period: cur.period,
+                    date: cur.date,
+                    curNums: cur.num,
+                    nextPeriod: null,
+                    nextDate: null,
+                    nextNums: null,
+                    nextVal: null,
+                });
+            }
+        }
+        const detailRows = details.map(it => {
+            if (it.nextVal === null) {
+                return `<tr><td>${it.period}</td><td>${it.date}</td><td>${(it.curNums || []).join(' ')}</td><td class="trans-zero" colspan="4">最新一期，尚无下一期开奖</td></tr>`;
+            }
+            const isTop = ranked.findIndex(x => x.n === it.nextVal) < 3;
+            const cls = isTop ? ' class="trans-hit-top"' : '';
+            return `<tr${cls}><td>${it.period}</td><td>${it.date}</td><td>${(it.curNums || []).join(' ')}</td><td>${it.nextPeriod}</td><td>${(it.nextNums || []).join(' ')}</td><td><b style="color:${isTop ? '#43e97b' : 'rgba(255,255,255,0.9)'};font-size:1rem;">${it.nextVal}</b></td></tr>`;
+        }).join('');
+
+        const bars = Array.from({ length: 10 }, (_, n) => {
+            const cnt = row[n];
+            const pct = rowSum > 0 ? (cnt / rowSum * 100) : 0;
+            const h = (cnt / maxCnt * 100);
+            const isTop = ranked.findIndex(x => x.n === n) < 3 && cnt > 0;
+            const cellStyle = 'display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;height:110px;min-width:32px;';
+            const cntStyle = 'font-size:0.75rem;color:rgba(255,255,255,0.75);margin-bottom:2px;';
+            const wrapStyle = 'width:100%;max-width:40px;height:70px;display:flex;align-items:flex-end;justify-content:center;';
+            const barColor = isTop ? 'background:linear-gradient(180deg,#43e97b,#38f9d7);box-shadow:0 0 10px rgba(67,233,123,0.4);opacity:1;' : 'background:linear-gradient(180deg,#4facfe,#0072e3);opacity:0.7;';
+            const barStyle = `width:100%;${barColor}border-radius:4px 4px 0 0;min-height:2px;height:${h}%;transition:height 0.3s ease;`;
+            const numColor = isTop ? 'color:#43e97b;' : 'color:rgba(255,255,255,0.6);';
+            const numStyle = `font-size:0.85rem;font-weight:bold;${numColor}margin-top:4px;`;
+            return `<div class="trans-bar-cell" style="${cellStyle}" title="下期=${n}：${cnt} 次（${pct.toFixed(1)}%）">
+                <div class="trans-bar-cnt" style="${cntStyle}">${cnt}</div>
+                <div class="trans-bar-wrap" style="${wrapStyle}"><div class="trans-bar${isTop ? ' top' : ''}" style="${barStyle}"></div></div>
+                <div class="trans-bar-num${isTop ? ' top' : ''}" style="${numStyle}">${n}</div>
+            </div>`;
+        }).join('');
+
+        return `
+            <div class="trans-section" style="padding:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);border-radius:12px;margin-bottom:16px;">
+                <h3 style="font-size:0.95rem;margin-bottom:8px;color:rgba(255,255,255,0.9);">${posName} · 上期=<b style="color:#43e97b;font-size:1.1rem;">${d}</b></h3>
+                <div class="trans-occurrence" style="font-size:0.85rem;color:rgba(255,255,255,0.8);padding:10px 12px;background:rgba(245,175,25,0.08);border:1px solid rgba(245,175,25,0.25);border-radius:8px;margin-bottom:14px;">
+                    在最近 <b style="color:#f5af19;">${L0}</b> 期中，${posName}=<b style="color:#43e97b;font-size:1.05rem;">${d}</b> 总共出现 <b style="color:#43e97b;font-size:1.05rem;">${occurrence}</b> 次${occurrence > rowSum ? `（其中最新 1 次尚无下一期开奖，已统计 <b style="color:#43e97b;">${rowSum}</b> 次的"下一期"分布）` : ''}
+                </div>
+                <div class="trans-bars" style="display:flex;gap:6px;align-items:flex-end;margin-bottom:12px;padding:10px 4px;background:rgba(0,0,0,0.15);border-radius:8px;">${bars}</div>
+                <div class="trans-top" style="font-size:0.85rem;color:rgba(255,255,255,0.8);padding:8px 12px;background:rgba(67,233,123,0.1);border-radius:8px;margin-bottom:14px;">下期${posName} TOP3：${top3 || '<span class="trans-zero" style="color:rgba(255,255,255,0.4);">无数据</span>'}</div>
+                <details class="trans-matrix-details" style="margin-top:6px;margin-bottom:10px;">
+                    <summary style="cursor:pointer;font-size:0.82rem;color:rgba(255,255,255,0.6);padding:6px 0;user-select:none;">📋 查看 ${posName} 完整转移矩阵（10×10）</summary>
+                    <div class="trans-table-scroll" style="overflow-x:auto;margin-top:8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
+                        <table class="trans-matrix-table" style="border-collapse:collapse;font-size:0.75rem;width:max-content;">
+                            <thead>${matrixHead}</thead>
+                            <tbody>${matrixBody}</tbody>
+                        </table>
+                    </div>
+                </details>
+                <details class="trans-matrix-details" open style="margin-top:6px;">
+                    <summary style="cursor:pointer;font-size:0.82rem;color:rgba(255,255,255,0.6);padding:6px 0;user-select:none;">📝 ${posName}=${d} 的逐期明细（共 ${details.length} 条，按时间由远到近）</summary>
+                    <div class="trans-table-scroll" style="overflow-x:auto;margin-top:8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">
+                        <table class="trans-detail-table" style="border-collapse:collapse;font-size:0.8rem;width:100%;min-width:480px;">
+                            <thead><tr><th>期号</th><th>日期</th><th>当期号码</th><th>下一期号</th><th>下期日期</th><th>下期${posName}</th></tr></thead>
+                            <tbody>${detailRows}</tbody>
+                        </table>
+                    </div>
+                </details>
+            </div>
+        `;
+    }).join('');
+
+    panel.innerHTML = `
+        <div class="trans-toolbar" style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:10px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:10px;">
+            <label class="parity-limit-label" style="display:inline-flex;align-items:center;gap:8px;font-size:0.88rem;color:rgba(255,255,255,0.85);">统计期数：
+                <select id="pl3TransLimit" style="background:rgba(245,175,25,0.12);color:#ffd98a;border:1px solid rgba(245,175,25,0.4);border-radius:8px;padding:6px 12px;font-size:0.85rem;font-weight:bold;cursor:pointer;outline:none;">${opts}</select>
+            </label>
+            <span class="parity-avail" style="font-size:0.8rem;color:rgba(255,255,255,0.55);">可用历史 <b style="color:#43e97b;">${maxAvail}</b> 期 · 转移对数 <b style="color:#43e97b;">${totalPairs}</b></span>
+        </div>
+        <div class="trans-prev-input" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px;padding:12px 14px;background:rgba(67,233,123,0.08);border:1px solid rgba(67,233,123,0.25);border-radius:10px;">
+            <span class="trans-prev-label" style="font-size:0.9rem;font-weight:bold;color:rgba(255,255,255,0.85);">上期号码：</span>
+            ${prevInput.replace(/data-pos="(\d+)"/g, (_, p) => `data-pos="${p}" style="width:54px;padding:8px 4px;background:rgba(67,233,123,0.12);color:#7df5b0;border:1px solid rgba(67,233,123,0.4);border-radius:8px;font-size:1.2rem;font-weight:bold;text-align:center;outline:none;"`)}
+            <span class="trans-prev-hint" style="font-size:0.78rem;color:rgba(255,255,255,0.55);">（输入 0-9，自动统计各位转移分布）</span>
+        </div>
+        ${sections}
+    `;
+
+    // 绑定期数选择
+    const limitSel = document.getElementById('pl3TransLimit');
+    if (limitSel) {
+        limitSel.addEventListener('change', e => {
+            s.limit = parseInt(e.target.value, 10) || 30;
+            renderPl3Trans(s.history);
+        });
+    }
+    // 绑定号码输入
+    panel.querySelectorAll('.trans-num-input').forEach(inp => {
+        inp.addEventListener('input', e => {
+            let v = parseInt(e.target.value, 10);
+            if (isNaN(v)) v = 0;
+            v = Math.max(0, Math.min(9, v));
+            e.target.value = v;
+            const pos = parseInt(e.target.dataset.pos, 10);
+            s.prevNum[pos] = v;
+            renderPl3Trans(s.history);
+        });
+    });
+}
+
 function onTrendCellClick(type, td) {
     const s = TREND_STATE[type];
     if (!s.drawMode) return;
+    // pl3 多段显示时，画线只在当前选中的 pos 段生效
+    const cellPos = parseInt(td.dataset.pos, 10);
+    if (cellPos !== s.pos) return;
     const row = parseInt(td.dataset.row, 10);
     const col = parseInt(td.dataset.col, 10);
     const key = `r${row}c${col}`;
@@ -809,28 +1157,43 @@ function drawTrendSvg(type) {
     svg.innerHTML = '';
 
     // 自动趋势线
-    const hits = tbody.querySelectorAll('.num-cell.hit');
-    if (hits.length >= 2) {
-        const pts = [];
-        hits.forEach(td => {
-            const r = td.getBoundingClientRect();
-            pts.push({
-                x: r.left - wrapRect.left + r.width / 2 + wrap.scrollLeft,
-                y: r.top - wrapRect.top + r.height / 2 + wrap.scrollTop
-            });
-        });
-        for (let i = 0; i < pts.length - 1; i++) {
-            const [x1, y1, x2, y2] = shrinkLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y, 14);
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', x1); line.setAttribute('y1', y1);
-            line.setAttribute('x2', x2); line.setAttribute('y2', y2);
-            line.setAttribute('stroke', '#f12711');
-            line.setAttribute('stroke-width', '1.6');
-            line.setAttribute('stroke-linecap', 'round');
-            line.setAttribute('opacity', '0.9');
-            svg.appendChild(line);
-        }
+    // pl3 多段显示：按 data-pos 分组，每组分别画趋势线
+    // pl5 单段：所有 hit 画一条趋势线
+    const s = TREND_STATE[type];
+    const showAllPos = (type === 'pl3');
+    let trendGroups;
+    if (showAllPos) {
+        trendGroups = [[0], [1], [2]];
+    } else {
+        trendGroups = [[s.pos]];
     }
+    const trendColors = ['#f12711', '#3b82f6', '#a855f7', '#f5af19', '#43e97b'];
+    trendGroups.forEach((posArr, gi) => {
+        const pos = posArr[0];
+        const color = trendColors[gi % trendColors.length];
+        const hits = tbody.querySelectorAll(`.num-cell.hit[data-pos="${pos}"]`);
+        if (hits.length >= 2) {
+            const pts = [];
+            hits.forEach(td => {
+                const r = td.getBoundingClientRect();
+                pts.push({
+                    x: r.left - wrapRect.left + r.width / 2 + wrap.scrollLeft,
+                    y: r.top - wrapRect.top + r.height / 2 + wrap.scrollTop
+                });
+            });
+            for (let i = 0; i < pts.length - 1; i++) {
+                const [x1, y1, x2, y2] = shrinkLine(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y, 14);
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+                line.setAttribute('stroke', color);
+                line.setAttribute('stroke-width', '1.6');
+                line.setAttribute('stroke-linecap', 'round');
+                line.setAttribute('opacity', '0.9');
+                svg.appendChild(line);
+            }
+        }
+    });
 
     // 手动画线
     const drawings = getCurrentTrendDrawings(type);
@@ -866,7 +1229,11 @@ function drawTrendSvg(type) {
 }
 
 function findTrendCell(type, key) {
-    return document.querySelector(`#${type}TrendGrid td[data-row="${key.match(/r(\d+)/)[1]}"][data-col="${key.match(/c(\d+)/)[1]}"]`);
+    const row = key.match(/r(\d+)/)[1];
+    const col = key.match(/c(\d+)/)[1];
+    const s = TREND_STATE[type];
+    // pl3 多段显示时，需要按 pos 区分；pl5 单段时 pos 也是当前选中位
+    return document.querySelector(`#${type}TrendGrid td[data-pos="${s.pos}"][data-row="${row}"][data-col="${col}"]`);
 }
 
 function updateTrendHint(type) {
@@ -923,7 +1290,13 @@ function setupTrendControls() {
                 TREND_STATE[type].pos = parseInt(btn.dataset.pos, 10);
                 TREND_STATE[type].drawStart = null;
                 document.querySelectorAll(`#${type}TrendPanel .trend-pos-btn`).forEach(b => b.classList.toggle('active', b === btn));
-                renderTrendPanel(type, TREND_STATE[type].history);
+                // pl3 三段同时显示，切换画线段只需重绘 SVG + 提示；pl5 单段需重渲染
+                if (type === 'pl3') {
+                    drawTrendSvg(type);
+                    updateTrendHint(type);
+                } else {
+                    renderTrendPanel(type, TREND_STATE[type].history);
+                }
             });
         });
         // 加载本地画线
@@ -940,6 +1313,14 @@ function setupTrendControls() {
             window.addEventListener('resize', onScroll);
         }
     });
+
+    // 排列三 012路走势图 期数切换
+    const roadLimitSel = document.getElementById('pl3RoadTrendLimit');
+    if (roadLimitSel) {
+        roadLimitSel.addEventListener('change', () => {
+            renderPl3RoadTrend(TREND_STATE.pl3.history);
+        });
+    }
 }
 
 // 按需抓取更多排列三期数并刷新奇偶比分析
@@ -1658,12 +2039,14 @@ clearMatrixBtn.addEventListener('click', clearMatrix);
 // ====== 排列三 5×5×5 复式直选算法 ======
 
 const PL3_ALGORITHMS = [
-    { id: 'road',   name: '012路均衡(修正)', desc: '路内数字归一化占比',  weight: 1.0 },
-    { id: 'big',    name: '大小均衡',        desc: '0-4小/5-9大占比',     weight: 1.0 },
-    { id: 'odd',    name: '奇偶均衡',        desc: '奇偶占比',            weight: 1.0 },
-    { id: 'repeat', name: '重号分析',        desc: '与上期该位重复参考',  weight: 0.8 },
-    { id: 'hot',    name: '位频率',          desc: '该位高频数字优先',     weight: 0.6 },
-    { id: 'miss',   name: '位遗漏(弱)',      desc: '该位遗漏(弱参考)',    weight: 0.2 },
+    { id: 'road',        name: '012路均衡(修正)', desc: '路内数字归一化占比',  weight: 1.0 },
+    { id: 'big',         name: '大小均衡',        desc: '0-4小/5-9大占比',     weight: 1.0 },
+    { id: 'odd',         name: '奇偶均衡',        desc: '奇偶占比',            weight: 1.0 },
+    { id: 'repeat',      name: '重号分析',        desc: '与上期该位重复参考',  weight: 0.8 },
+    { id: 'hot',         name: '位频率',          desc: '该位高频数字优先',     weight: 0.6 },
+    { id: 'miss',        name: '位遗漏(弱)',      desc: '该位遗漏(弱参考)',    weight: 0.2 },
+    { id: 'parityRatio', name: '奇偶比预测',      desc: '组合级奇偶比趋势预测', weight: 1.2 },
+    { id: 'sizeRatio',   name: '大小比预测',      desc: '组合级大小比趋势预测', weight: 1.2 },
 ];
 
 // 构建排列三算法配置
@@ -1755,8 +2138,130 @@ function pl3AlgoRepeat(history, pos) {
     return s;
 }
 
+// ====== 奇偶比 / 大小比 组合级预测 ======
+// 奇数:1,3,5,7,9  偶数:0,2,4,6,8
+// 大数:5,6,7,8,9  小数:0,1,2,3,4
+
+// 计算一组号码的奇偶比(奇:偶)和大小比(大:小)
+function pl3CalcRatios(nums) {
+    let odd = 0, big = 0;
+    for (const n of nums) {
+        if (n % 2 === 1) odd++;
+        if (n >= 5) big++;
+    }
+    return { odd, even: 3 - odd, big, small: 3 - big };
+}
+
+// 预测下期奇偶比 / 大小比
+// 综合策略：长期分布 + 近期分布(近30期) + 连续偏态回调 + 上期反转参考
+function pl3PredictRatio(history) {
+    const ratios = history.map(h => pl3CalcRatios(h.num || [0, 0, 0]));
+
+    // 长期分布（全部历史）
+    const longOdd = { '3:0': 0, '2:1': 0, '1:2': 0, '0:3': 0 };
+    const longBig = { '3:0': 0, '2:1': 0, '1:2': 0, '0:3': 0 };
+    // 近期分布（最近30期）
+    const nearOdd = { '3:0': 0, '2:1': 0, '1:2': 0, '0:3': 0 };
+    const nearBig = { '3:0': 0, '2:1': 0, '1:2': 0, '0:3': 0 };
+
+    ratios.forEach((r, i) => {
+        const ok = r.odd + ':' + r.even;
+        const bk = r.big + ':' + r.small;
+        longOdd[ok]++; longBig[bk]++;
+        if (i < 30) { nearOdd[ok]++; nearBig[bk]++; }
+    });
+
+    const totalLong = history.length || 1;
+    const totalNear = Math.min(30, history.length);
+
+    // 综合得分：长期40% + 近期50% + 回调10%
+    function score(distLong, distNear, totalL, totalN, lastKey) {
+        const keys = ['3:0', '2:1', '1:2', '0:3'];
+        const scores = {};
+        for (const k of keys) {
+            const longP = distLong[k] / totalL;
+            const nearP = distNear[k] / totalN;
+            scores[k] = longP * 0.4 + nearP * 0.5;
+        }
+        // 回调：上期若是极端(3:0/0:3)，给均衡(2:1/1:2)加成
+        if (lastKey === '3:0' || lastKey === '0:3') {
+            scores['2:1'] += 0.05;
+            scores['1:2'] += 0.05;
+        }
+        // 连续偏态检测：最近3期是否连续同方向偏态
+        return scores;
+    }
+
+    const last = ratios[0] || { odd: 1, even: 2, big: 1, small: 2 };
+    const lastOddKey = last.odd + ':' + last.even;
+    const lastBigKey = last.big + ':' + last.small;
+
+    // 最近3期连续偏态检测
+    let oddStreak = 0, bigStreak = 0;
+    const oddVals = ratios.slice(0, 3).map(r => r.odd);
+    const bigVals = ratios.slice(0, 3).map(r => r.big);
+    // 奇偶连续偏大(奇数>=2)或偏小(奇数<=1)
+    if (oddVals.every(v => v >= 2)) oddStreak = 1;       // 连续偏奇
+    else if (oddVals.every(v => v <= 1)) oddStreak = -1;  // 连续偏偶
+    if (bigVals.every(v => v >= 2)) bigStreak = 1;        // 连续偏大
+    else if (bigVals.every(v => v <= 1)) bigStreak = -1;   // 连续偏小
+
+    const oddScores = score(longOdd, nearOdd, totalLong, totalNear, lastOddKey);
+    const bigScores = score(longBig, nearBig, totalLong, totalNear, lastBigKey);
+
+    // 连续偏态时给反方向加成
+    if (oddStreak === 1) { oddScores['1:2'] += 0.08; oddScores['0:3'] += 0.03; }
+    else if (oddStreak === -1) { oddScores['2:1'] += 0.08; oddScores['3:0'] += 0.03; }
+    if (bigStreak === 1) { bigScores['1:2'] += 0.08; bigScores['0:3'] += 0.03; }
+    else if (bigStreak === -1) { bigScores['2:1'] += 0.08; bigScores['3:0'] += 0.03; }
+
+    // 选最高分
+    let bestOdd = '2:1', bestOddScore = -1;
+    for (const k of ['3:0', '2:1', '1:2', '0:3']) {
+        if (oddScores[k] > bestOddScore) { bestOddScore = oddScores[k]; bestOdd = k; }
+    }
+    let bestBig = '2:1', bestBigScore = -1;
+    for (const k of ['3:0', '2:1', '1:2', '0:3']) {
+        if (bigScores[k] > bestBigScore) { bestBigScore = bigScores[k]; bestBig = k; }
+    }
+
+    return {
+        oddRatio: bestOdd,     // 预测奇偶比 "奇:偶"
+        bigRatio: bestBig,     // 预测大小比 "大:小"
+        oddScores, bigScores,
+        lastOddKey, lastBigKey,
+        oddStreak, bigStreak,
+        longOddDist: longOdd, longBigDist: longBig,
+        nearOddDist: nearOdd, nearBigDist: nearBig
+    };
+}
+
+// 奇偶比预测算法：按预测的奇偶比给该位数字打分
+// 如果预测奇偶比=1:2(1奇2偶)，则该位更可能是偶数(2/3概率)或奇数(1/3)
+// 每位独立计算：预测奇数占比 = oddCount/3
+function pl3AlgoParityRatio(predict, pos) {
+    const [oddCnt] = predict.oddRatio.split(':').map(Number);
+    const oddRatio = oddCnt / 3; // 该位为奇数的预测概率
+    const s = new Array(10).fill(0);
+    for (let d = 0; d <= 9; d++) {
+        s[d] = d % 2 === 1 ? oddRatio : (1 - oddRatio);
+    }
+    return s;
+}
+
+// 大小比预测算法：按预测的大小比给该位数字打分
+function pl3AlgoSizeRatio(predict, pos) {
+    const [bigCnt] = predict.bigRatio.split(':').map(Number);
+    const bigRatio = bigCnt / 3; // 该位为大数的预测概率
+    const s = new Array(10).fill(0);
+    for (let d = 0; d <= 9; d++) {
+        s[d] = d >= 5 ? bigRatio : (1 - bigRatio);
+    }
+    return s;
+}
+
 // 每位融合打分，返回 topK 候选(已排序)
-function pl3FusePick(pos, stats, history, enabled, weights, topK) {
+function pl3FusePick(pos, stats, history, enabled, weights, topK, predict) {
     const fused = new Array(10).fill(0);
     let wsum = 0;
     const runners = {
@@ -1766,6 +2271,8 @@ function pl3FusePick(pos, stats, history, enabled, weights, topK) {
         big: () => pl3AlgoBig(history, pos),
         odd: () => pl3AlgoOdd(history, pos),
         repeat: () => pl3AlgoRepeat(history, pos),
+        parityRatio: () => pl3AlgoParityRatio(predict, pos),
+        sizeRatio: () => pl3AlgoSizeRatio(predict, pos),
     };
     PL3_ALGORITHMS.forEach(a => {
         if (!enabled[a.id]) return;
@@ -1820,19 +2327,38 @@ function pl3HistStats(history) {
         for (let d = 0; d <= 9; d++) { all += freq[d]; if (d >= 5) big += freq[d]; }
         return all ? big / all : 0.5;
     });
+    // 历史奇偶比 / 大小比 组合分布
+    const ratioDist = {}; // "奇偶X:Y/大小A:B" -> 次数
+    const oddRatioDist = { '3:0': 0, '2:1': 0, '1:2': 0, '0:3': 0 };
+    const bigRatioDist = { '3:0': 0, '2:1': 0, '1:2': 0, '0:3': 0 };
+    history.forEach(it => {
+        const n = it.num || [];
+        if (n.length === 3) {
+            const r = pl3CalcRatios(n);
+            const ok = r.odd + ':' + r.even;
+            const bk = r.big + ':' + r.small;
+            oddRatioDist[ok]++; bigRatioDist[bk]++;
+            const ck = '奇偶' + ok + '/大小' + bk;
+            ratioDist[ck] = (ratioDist[ck] || 0) + 1;
+        }
+    });
     return {
         sumDist: sumDist.map(x => x / tot),
         sumAvg: rawSum / tot,
         spanAvg: spanSum / tot,
         form: { zu6: zu6 / tot, zu3: zu3 / tot, bao: bao / tot },
-        posTop5, posBigRatio
+        posTop5, posBigRatio,
+        oddRatioDist, bigRatioDist, ratioDist
     };
 }
 
-// 组合级评分：覆盖率(直接关系命中率) + 和值/跨度/形态 + 强制去重
-function pl3ComboScore(bai, shi, ge, hist) {
+// 组合级评分：覆盖率(直接关系命中率) + 和值/跨度/形态 + 奇偶比/大小比贴合 + 强制去重
+function pl3ComboScore(bai, shi, ge, hist, predict) {
     const sumDist = new Array(28).fill(0);
     let spanSum = 0, zu3 = 0, zu6 = 0, bao = 0;
+    // 组合级奇偶比/大小比分布
+    const oddRatioCombo = { '3:0': 0, '2:1': 0, '1:2': 0, '0:3': 0 };
+    const bigRatioCombo = { '3:0': 0, '2:1': 0, '1:2': 0, '0:3': 0 };
     bai.forEach(a => shi.forEach(b => ge.forEach(c => {
         const sum = a + b + c;
         const span = Math.max(a, b, c) - Math.min(a, b, c);
@@ -1841,6 +2367,10 @@ function pl3ComboScore(bai, shi, ge, hist) {
         if (a === b && b === c) bao++;
         else if (a === b || b === c || a === c) zu3++;
         else zu6++;
+        // 统计125注组合的奇偶比/大小比分布
+        const r = pl3CalcRatios([a, b, c]);
+        oddRatioCombo[r.odd + ':' + r.even]++;
+        bigRatioCombo[r.big + ':' + r.small]++;
     })));
     let sumHit = 0;
     for (let s = 0; s <= 27; s++) if (hist.sumDist[s] >= 0.03) sumHit += sumDist[s];
@@ -1856,16 +2386,25 @@ function pl3ComboScore(bai, shi, ge, hist) {
     const coverageScore = (covBai + covShi + covGe) / 3;
     const uniqBai = new Set(bai).size, uniqShi = new Set(shi).size, uniqGe = new Set(ge).size;
     const uniqPenalty = ((5 - uniqBai) + (5 - uniqShi) + (5 - uniqGe)) * 1.0;
+
+    // 奇偶比/大小比贴合度：125注中符合预测比例的占比
+    let ratioScore = 0;
+    if (predict) {
+        const oddHit = oddRatioCombo[predict.oddRatio] || 0;
+        const bigHit = bigRatioCombo[predict.bigRatio] || 0;
+        ratioScore = (oddHit + bigHit) / (125 * 2);
+    }
+
     return {
-        total: coverageScore * 0.35 + sumScore * 0.25 + spanScore * 0.2 + formScore * 0.2 - uniqPenalty,
-        coverageScore, sumScore, spanScore, formScore
+        total: coverageScore * 0.28 + sumScore * 0.18 + spanScore * 0.12 + formScore * 0.12 + ratioScore * 0.30 - uniqPenalty,
+        coverageScore, sumScore, spanScore, formScore, ratioScore
     };
 }
 
 // 组合级贪心优化：仅替换 cur 中每位尚未覆盖的候选，且强制每位 5 个互不相同
-function pl3Optimize(bai, shi, ge, candidates, hist) {
+function pl3Optimize(bai, shi, ge, candidates, hist, predict) {
     const cur = [bai.slice(), shi.slice(), ge.slice()];
-    let best = pl3ComboScore(cur[0], cur[1], cur[2], hist);
+    let best = pl3ComboScore(cur[0], cur[1], cur[2], hist, predict);
     let improved = true, rounds = 0;
     while (improved && rounds < 20) {
         improved = false; rounds++;
@@ -1887,7 +2426,7 @@ function pl3Optimize(bai, shi, ge, candidates, hist) {
                 for (const d of bench) {
                     cur[pos][i] = d;
                     if (new Set(cur[pos]).size !== cur[pos].length) { cur[pos][i] = orig; continue; }
-                    const sc = pl3ComboScore(cur[0], cur[1], cur[2], hist);
+                    const sc = pl3ComboScore(cur[0], cur[1], cur[2], hist, predict);
                     if (sc.total > best.total + 0.0005) {
                         best = sc; improved = true;
                         break;
@@ -1961,20 +2500,22 @@ async function pl3Pick() {
 
     const stats = buildPl3Stats(history);
     const hist = pl3HistStats(history);
+    const predict = pl3PredictRatio(history);
 
     // 层1：每位打分取 top8 候选
-    const candBai = pl3FusePick(0, stats, history, enabled, weights, 8);
-    const candShi = pl3FusePick(1, stats, history, enabled, weights, 8);
-    const candGe = pl3FusePick(2, stats, history, enabled, weights, 8);
+    const candBai = pl3FusePick(0, stats, history, enabled, weights, 8, predict);
+    const candShi = pl3FusePick(1, stats, history, enabled, weights, 8, predict);
+    const candGe = pl3FusePick(2, stats, history, enabled, weights, 8, predict);
 
     // 层2：组合级贪心优化，从 top8 中选最优 top5
-    const opt = pl3Optimize(candBai.slice(0, 5), candShi.slice(0, 5), candGe.slice(0, 5), [candBai, candShi, candGe], hist);
+    const opt = pl3Optimize(candBai.slice(0, 5), candShi.slice(0, 5), candGe.slice(0, 5), [candBai, candShi, candGe], hist, predict);
     const bai = opt.bai, shi = opt.shi, ge = opt.ge;
     lastPl3Pick = { bai: bai.slice(), shi: shi.slice(), ge: ge.slice() };
     const an = pl3Analyze(bai, shi, ge);
     console.log('%c[PL3 智能选号]', 'color:#43e97b;font-weight:bold');
     console.log('  候选池 百位:', candBai, '十位:', candShi, '个位:', candGe);
     console.log('  最终推荐 百位:', bai, '十位:', shi, '个位:', ge);
+    console.log('  预测奇偶比:', predict.oddRatio, '预测大小比:', predict.bigRatio);
     console.log('  组合级评分:', opt.score);
     console.log('  历史每位top5:', hist.posTop5);
     console.log('  形态:', an);
@@ -1999,7 +2540,27 @@ async function pl3Pick() {
             <div class="pl3-analysis">
                 <div>📊 共 <b>${an.total}</b> 注 · 和值 <b>${an.sumMin}~${an.sumMax}</b> · 跨度 <b>${an.spanMin}~${an.spanMax}</b></div>
                 <div class="pl3-form">形态：组六(三不同) <b>${an.zu6}</b> 注 · 组三(两同) <b>${an.zu3}</b> 注 · 豹子(三同) <b>${an.bao}</b> 注</div>
-                <div class="pl3-combo">🎯 组合级贴合度：<b>${(sc.total * 100).toFixed(1)}%</b>（和值 ${(sc.sumScore * 100).toFixed(0)}% · 跨度 ${(sc.spanScore * 100).toFixed(0)}% · 形态 ${(sc.formScore * 100).toFixed(0)}%）</div>
+                <div class="pl3-combo">🎯 组合级贴合度：<b>${(sc.total * 100).toFixed(1)}%</b>（和值 ${(sc.sumScore * 100).toFixed(0)}% · 跨度 ${(sc.spanScore * 100).toFixed(0)}% · 形态 ${(sc.formScore * 100).toFixed(0)}% · 奇偶大小比 ${(sc.ratioScore * 100).toFixed(0)}%）</div>
+                <div class="pl3-ratio-predict">
+                    <div class="ratio-predict-title">🔮 下期奇偶比/大小比预测</div>
+                    <div class="ratio-predict-row">
+                        <span class="ratio-tag ratio-odd">奇偶比 <b>${predict.oddRatio}</b></span>
+                        <span class="ratio-tag ratio-big">大小比 <b>${predict.bigRatio}</b></span>
+                        <span class="ratio-streak">上期: 奇偶${predict.lastOddKey} · 大小${predict.lastBigKey}</span>
+                    </div>
+                    <div class="ratio-predict-detail">
+                        奇偶比得分: 3:0=${(predict.oddScores['3:0']*100).toFixed(0)}% · 2:1=${(predict.oddScores['2:1']*100).toFixed(0)}% · 1:2=${(predict.oddScores['1:2']*100).toFixed(0)}% · 0:3=${(predict.oddScores['0:3']*100).toFixed(0)}%
+                    </div>
+                    <div class="ratio-predict-detail">
+                        大小比得分: 3:0=${(predict.bigScores['3:0']*100).toFixed(0)}% · 2:1=${(predict.bigScores['2:1']*100).toFixed(0)}% · 1:2=${(predict.bigScores['1:2']*100).toFixed(0)}% · 0:3=${(predict.bigScores['0:3']*100).toFixed(0)}%
+                    </div>
+                    <div class="ratio-predict-detail" style="color:rgba(255,255,255,0.4)">
+                        长期奇偶分布: 3:0=${predict.longOddDist['3:0']} · 2:1=${predict.longOddDist['2:1']} · 1:2=${predict.longOddDist['1:2']} · 0:3=${predict.longOddDist['0:3']} | 近30期: 3:0=${predict.nearOddDist['3:0']} · 2:1=${predict.nearOddDist['2:1']} · 1:2=${predict.nearOddDist['1:2']} · 0:3=${predict.nearOddDist['0:3']}
+                    </div>
+                    <div class="ratio-predict-detail" style="color:rgba(255,255,255,0.4)">
+                        长期大小分布: 3:0=${predict.longBigDist['3:0']} · 2:1=${predict.longBigDist['2:1']} · 1:2=${predict.longBigDist['1:2']} · 0:3=${predict.longBigDist['0:3']} | 近30期: 3:0=${predict.nearBigDist['3:0']} · 2:1=${predict.nearBigDist['2:1']} · 1:2=${predict.nearBigDist['1:2']} · 0:3=${predict.nearBigDist['0:3']}
+                    </div>
+                </div>
                 <div class="pl3-balance">
                     <span class="pos-balance">百位：012路 ${bd.road} · 大小 ${bd.big}:${bd.small} · 奇偶 ${bd.odd}:${bd.even}</span>
                     <span class="pos-balance">十位：012路 ${sd.road} · 大小 ${sd.big}:${sd.small} · 奇偶 ${sd.odd}:${sd.even}</span>
