@@ -1038,9 +1038,9 @@ function renderTrans(type, history) {
             const pct = rowSum > 0 ? (cnt / rowSum * 100) : 0;
             const h = (cnt / maxCnt * 100);
             const isTop = ranked.findIndex(x => x.n === n) < 3 && cnt > 0;
-            const cellStyle = 'display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;height:110px;min-width:32px;';
+            const cellStyle = 'display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;height:110px;min-width:0;';
             const cntStyle = 'font-size:0.75rem;color:rgba(255,255,255,0.75);margin-bottom:2px;';
-            const wrapStyle = 'width:100%;max-width:40px;height:70px;display:flex;align-items:flex-end;justify-content:center;';
+            const wrapStyle = 'width:100%;max-width:40px;height:70px;display:flex;align-items:flex-end;justify-content:center;min-width:0;';
             const barColor = isTop ? 'background:linear-gradient(180deg,#43e97b,#38f9d7);box-shadow:0 0 10px rgba(67,233,123,0.4);opacity:1;' : 'background:linear-gradient(180deg,#4facfe,#0072e3);opacity:0.7;';
             const barStyle = `width:100%;${barColor}border-radius:4px 4px 0 0;min-height:2px;height:${h}%;transition:height 0.3s ease;`;
             const numColor = isTop ? 'color:#43e97b;' : 'color:rgba(255,255,255,0.6);';

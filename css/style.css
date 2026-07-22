@@ -2386,9 +2386,12 @@ footer {
 
 @media (max-width: 600px) {
     .trans-num-input { width: 44px; font-size: 1rem; }
-    .trans-bar-wrap { height: 56px; }
-    .trans-bar-cell { height: 92px; }
-    .trans-bars { gap: 3px; }
+    .trans-bar-wrap { height: 56px; max-width: 30px; }
+    .trans-bar-cell { height: 92px; min-width: 0; }
+    .trans-bars { gap: 2px; padding: 8px 2px; }
+    .trans-bar-num { font-size: 0.72rem; }
+    .trans-bar-cnt { font-size: 0.65rem; }
+    .trans-section { padding: 12px 10px; }
 }
 
 /* 逐期明细表 */
